@@ -1,0 +1,119 @@
+/**
+ * Guardrails for the Discovery Concierge recommendation engine.
+ *
+ * Design principle carried over from the discovery-engine's own eval layer
+ * (blueprint Part D / the n8n Evidence Validator node): never trust the LLM
+ * to grade itself. Every check here is deterministic — string/array
+ * comparisons against real data, not another model call.
+ *
+ * Maps to the 4 guardrail categories in the AI engine research doc:
+ *   - Hallucination & Accuracy   -> checkProductExists, checkEvidenceGrounded
+ *   - Behavioral Alignment       -> checkCategoryEligible
+ *   - Data & Privacy             -> checkNoPII
+ *   - Appropriateness / HAP      -> checkNoSensitiveInference (simplified —
+ *       see docs/ai-architecture.md for what a production version needs)
+ *
+ * Usage: runGuardrails(recommendation, context) -> { passed, failures }
+ * If ANY check fails, the caller (recommend.js) must fall back to the
+ * deterministic placeholder logic already in the mvp-shell — never show a
+ * recommendation that failed a guardrail, even partially.
+ */
+
+function checkOutputSchema(rec) {
+  const required = ['product_id', 'reasoning', 'evidence_ids']
+  const missing = required.filter((k) => rec[k] === undefined || rec[k] === null)
+  if (missing.length > 0) {
+    return { passed: false, reason: `MALFORMED_OUTPUT: missing fields [${missing.join(', ')}]` }
+  }
+  if (typeof rec.product_id !== 'string' || typeof rec.reasoning !== 'string') {
+    return { passed: false, reason: 'MALFORMED_OUTPUT: wrong field types' }
+  }
+  if (!Array.isArray(rec.evidence_ids)) {
+    return { passed: false, reason: 'MALFORMED_OUTPUT: evidence_ids must be an array' }
+  }
+  return { passed: true }
+}
+
+function checkProductExists(rec, context) {
+  const product = context.validProducts.find((p) => p.id === rec.product_id)
+  if (!product) {
+    return { passed: false, reason: `HALLUCINATED_PRODUCT: "${rec.product_id}" not found in real catalog` }
+  }
+  return { passed: true, product }
+}
+
+function checkCategoryEligible(rec, context, product) {
+  if (!context.neverTriedCategories.includes(product.category)) {
+    return {
+      passed: false,
+      reason: `CATEGORY_VIOLATION: "${product.category}" is not in this persona's never_tried list — the model recommended something the persona already orders`,
+    }
+  }
+  return { passed: true }
+}
+
+function checkEvidenceGrounded(rec, context) {
+  const validIds = new Set(context.validThemes.flatMap((t) => t.evidence_ids))
+  const hallucinated = (rec.evidence_ids || []).filter((id) => !validIds.has(id))
+  if (hallucinated.length > 0) {
+    return { passed: false, reason: `HALLUCINATED_EVIDENCE: [${hallucinated.join(', ')}] not found in retrieved themes` }
+  }
+  if ((rec.evidence_ids || []).length === 0) {
+    return { passed: false, reason: 'UNGROUNDED_OUTPUT: reasoning cites zero evidence — likely not RAG-grounded' }
+  }
+  return { passed: true }
+}
+
+// Simplified appropriateness/PII checks. A production system should use a
+// dedicated classifier (per the research doc's citation of HAP filtering
+// tools) — this is a pattern-based stand-in sufficient for a demo where the
+// underlying data is synthetic personas, not real user PII.
+const SENSITIVE_INFERENCE_PATTERN = /pregnan|diagnos|disease|illness|std\b|hiv|mental health|therapy|medication for/i
+const PII_PATTERN = /\b\d{10}\b|[\w.+-]+@[\w-]+\.[\w.-]+|\b\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/
+
+function checkNoSensitiveInference(rec) {
+  if (SENSITIVE_INFERENCE_PATTERN.test(rec.reasoning)) {
+    return { passed: false, reason: 'SENSITIVE_INFERENCE_FLAGGED: reasoning appears to infer a health/personal condition' }
+  }
+  return { passed: true }
+}
+
+function checkNoPII(rec) {
+  if (PII_PATTERN.test(rec.reasoning)) {
+    return { passed: false, reason: 'PII_LEAK_FLAGGED: reasoning contains what looks like a phone number, email, or card number' }
+  }
+  return { passed: true }
+}
+
+/**
+ * Runs all guardrails in order. Cheapest/most-decisive checks first so we
+ * fail fast without wasting the (already-spent) LLM call reasoning further.
+ */
+export function runGuardrails(recommendation, context) {
+  const failures = []
+
+  const schemaCheck = checkOutputSchema(recommendation)
+  if (!schemaCheck.passed) {
+    failures.push(schemaCheck.reason)
+    return { passed: false, failures } // can't run further checks on malformed data
+  }
+
+  const productCheck = checkProductExists(recommendation, context)
+  if (!productCheck.passed) failures.push(productCheck.reason)
+
+  if (productCheck.passed) {
+    const categoryCheck = checkCategoryEligible(recommendation, context, productCheck.product)
+    if (!categoryCheck.passed) failures.push(categoryCheck.reason)
+  }
+
+  const evidenceCheck = checkEvidenceGrounded(recommendation, context)
+  if (!evidenceCheck.passed) failures.push(evidenceCheck.reason)
+
+  const sensitiveCheck = checkNoSensitiveInference(recommendation)
+  if (!sensitiveCheck.passed) failures.push(sensitiveCheck.reason)
+
+  const piiCheck = checkNoPII(recommendation)
+  if (!piiCheck.passed) failures.push(piiCheck.reason)
+
+  return { passed: failures.length === 0, failures }
+}

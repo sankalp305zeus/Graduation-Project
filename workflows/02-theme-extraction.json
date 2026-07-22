@@ -1,0 +1,502 @@
+{
+  "name": "02-theme-extraction",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "theme-extraction-demo",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "fad1c6f8-7730-42be-ad60-0d29abc415c1",
+      "name": "Webhook - Receive Clusters",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        250,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Validates the incoming webhook payload before entering the loop.\n// Expects: { \"clusters\": [ { \"cluster_id\": \"...\", \"reviews\": [ {id, text, rating}, ... ] }, ... ] }\nconst body = $input.item.json.body;\n\nif (!body || !Array.isArray(body.clusters)) {\n  throw new Error(\n    \"Invalid payload: expected { clusters: [ { cluster_id, reviews: [...] }, ... ] }. \" +\n    \"Got: \" + JSON.stringify(body).slice(0, 200)\n  );\n}\n\nif (body.clusters.length === 0) {\n  throw new Error(\"Payload has zero clusters — nothing to process.\");\n}\n\n// Split In Batches expects one item per array entry, so return each cluster as its own item.\nreturn body.clusters.map(cluster => ({ json: cluster }));\n"
+      },
+      "id": "9cb9bd0d-1df2-42aa-892e-9a17c37cab5b",
+      "name": "Validate & Parse Input",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        550,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "id": "d1e7ea14-278f-47c9-8556-ca3ab64af867",
+      "name": "Loop Clusters",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        850,
+        300
+      ],
+      "notes": "VERIFY AFTER IMPORT: output 0 = 'done' (fires once, all batches complete), output 1 = 'loop' (fires per batch). Confirm against your n8n version's UI labels before running the full corpus."
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Runs once per loop iteration (one cluster).\n// Samples up to 8 reviews for the LLM, but keeps the FULL cluster membership\n// separately — this is what fixes the evidence_ids problem: the LLM only\n// needs a readable sample to name the theme, but eval-grade evidence_ids\n// come from deterministic cluster membership, not from what the LLM read.\n\nconst cluster = $input.item.json;\nconst allReviews = cluster.reviews || [];\n\nif (allReviews.length === 0) {\n  throw new Error(`Cluster ${cluster.cluster_id} has zero reviews — check upstream clustering output.`);\n}\n\nconst sample = allReviews.slice(0, 8);\n\nconst formattedText = sample\n  .map(r => `[${r.id}] (rating: ${r.rating ?? \"n/a\"}) ${r.text}`)\n  .join(\"\\n\\n\");\n\nreturn [{\n  json: {\n    cluster_id: cluster.cluster_id,\n    sample_text: formattedText,\n    sample_ids: sample.map(r => r.id),\n    all_cluster_member_ids: allReviews.map(r => r.id),   // full evidence set, deterministic\n    all_cluster_reviews: allReviews                        // kept for the evidence validator step\n  }\n}];\n"
+      },
+      "id": "5dadc2f6-d163-41f4-a92a-0f2af172744f",
+      "name": "Prepare Cluster Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1150,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.sample_text }}",
+        "options": {
+          "systemMessage": "You are the Theme Agent. Your single responsibility: read a small sample of user reviews from ONE cluster and name the shared theme they express.\n\nYou have zero tools. You do not browse, search, or call anything. You only read the text given to you and respond in the exact JSON format below.\n\nINPUT: a block of 5-8 sample reviews from one cluster, each labeled with its review ID.\n\nTASK:\n1. Read all sample reviews.\n2. Identify the single dominant theme this cluster's reviews share (a specific, concrete complaint, praise, or behavior pattern — not a vague category).\n3. Write a 1-2 sentence description of the theme.\n4. Cite ONLY the review IDs from the sample you were given that clearly illustrate the theme (you may cite fewer than all 5-8 if some samples are off-topic noise).\n\nYou do NOT propose solutions, engineering fixes, or product ideas. You do NOT guess user demographics. You do NOT invent review IDs that were not in your input. You do NOT quote review text longer than a short phrase.\n\nOUTPUT — respond with ONLY this JSON, no other text:\n{\n  \"theme_name\": \"short, specific theme label\",\n  \"description\": \"1-2 sentence description\",\n  \"sample_evidence_ids\": [\"id1\", \"id2\"],\n  \"off_topic_ids\": [\"id3\"]\n}\n\nIf NONE of the sample reviews share a coherent theme, return:\n{\"theme_name\": \"NO_COHERENT_THEME\", \"description\": \"\", \"sample_evidence_ids\": [], \"off_topic_ids\": [<all ids>]}\n",
+          "maxIterations": 3
+        }
+      },
+      "id": "a37a482b-85a9-449c-8d06-9c749ee8ed37",
+      "name": "Theme Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1450,
+        60
+      ]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "937be767-1558-450b-9f40-2833822ab450",
+      "name": "Theme Agent Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1450,
+        200
+      ]
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.sample_text }}",
+        "options": {
+          "systemMessage": "You are the JTBD & Segment Agent. Your single responsibility: infer the underlying Job-To-Be-Done and likely user segment from a sample of reviews in ONE cluster.\n\nYou have zero tools. You only read the text given to you and respond in the exact JSON format below.\n\nINPUT: the same 5-8 sample reviews from one cluster, each labeled with its review ID.\n\nTASK:\n1. Infer what the user was fundamentally trying to accomplish (the job), independent of the specific complaint or praise.\n2. Infer the likely user segment (e.g., \"frequent grocery-only shopper\", \"first-time category explorer\", \"price-sensitive repeat buyer\") — base this ONLY on evidence in the text, not stereotypes.\n3. Identify the trigger, if visible in the text, that led the user to this moment (what were they doing right before).\n\nYou do NOT summarize app bugs or feature gaps. You do NOT propose product roadmap ideas. You do NOT invent review IDs not in your input.\n\nOUTPUT — respond with ONLY this JSON, no other text:\n{\n  \"core_job\": \"what the user was trying to accomplish\",\n  \"user_segment\": \"inferred segment label\",\n  \"trigger\": \"the situational trigger, or null if not visible in text\",\n  \"sample_evidence_ids\": [\"id1\", \"id2\"]\n}\n",
+          "maxIterations": 3
+        }
+      },
+      "id": "07a9f7a0-16cf-4c56-b1a1-bc632c4196c7",
+      "name": "JTBD Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1450,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "4a9967f2-0a64-451c-a354-3f971a7361b1",
+      "name": "JTBD Agent Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1450,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "text": "={{ $json.sample_text }}",
+        "options": {
+          "systemMessage": "You are the Opportunity Agent. Your single responsibility: propose ONE actionable product/engineering opportunity based strictly on a sample of reviews in ONE cluster.\n\nYou have zero tools. You only read the text given to you and respond in the exact JSON format below.\n\nINPUT: the same 5-8 sample reviews from one cluster, each labeled with its review ID.\n\nTASK:\n1. Propose exactly one concrete, actionable opportunity that would address what these reviews describe.\n2. Score it 1-5 on each of: frequency (how common this seems), severity (how much it blocks the user), solvability (how feasible to address).\n3. Do not hedge with multiple options — pick the single strongest opportunity.\n\nYou do NOT re-summarize the problem in detail (the Theme Agent already did that). You do NOT quote review text. You do NOT invent review IDs not in your input.\n\nOUTPUT — respond with ONLY this JSON, no other text:\n{\n  \"opportunity_title\": \"short actionable title\",\n  \"actionable_detail\": \"1-2 sentence description of the fix/feature\",\n  \"frequency_score\": 1,\n  \"severity_score\": 1,\n  \"solvability_score\": 1,\n  \"sample_evidence_ids\": [\"id1\", \"id2\"]\n}\n",
+          "maxIterations": 3
+        }
+      },
+      "id": "cf7adc23-9948-4383-a059-b21b5337263c",
+      "name": "Opportunity Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        1450,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {
+          "temperature": 0.2
+        }
+      },
+      "id": "1b27eba9-26a9-4cdf-8a98-dae5ced290b2",
+      "name": "Opportunity Agent Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        1450,
+        760
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combinationMode": "mergeByPosition",
+        "numberInputs": 3,
+        "options": {}
+      },
+      "id": "5531b0a1-aff4-45c1-b889-2f406a50a0c8",
+      "name": "Wait For All Spokes",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3,
+      "position": [
+        1800,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Reshapes the 3 merged spoke outputs into one object the Synthesizer agent can read.\nconst merged = $input.item.json;\nreturn [{\n  json: {\n    theme_output: merged.output ?? merged['0'] ?? merged,\n    jtbd_output: merged['1'] ?? null,\n    opportunity_output: merged['2'] ?? null\n  }\n}];\n// NOTE: exact merged-item shape depends on your n8n version's merge node output format.\n// Inspect one execution in the n8n UI and adjust field access here if needed."
+      },
+      "id": "c3d63d0e-194d-45f0-9192-8b2f8628ebd6",
+      "name": "Reshape For Synthesizer",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2050,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "text": "={{ JSON.stringify({theme_output: $json.theme_output, jtbd_output: $json.jtbd_output, opportunity_output: $json.opportunity_output}) }}",
+        "options": {
+          "systemMessage": "You are the Orchestrator Synthesizer. Your single responsibility: merge the three spoke agents' JSON outputs (Theme, JTBD, Opportunity) for ONE cluster into a single coherent object.\n\nYou have zero tools. You only read the three JSON payloads given to you and respond in the exact JSON format below.\n\nINPUT: three JSON objects — theme_output, jtbd_output, opportunity_output — all describing the same cluster.\n\nTASK:\n1. Combine the three into one object.\n2. If theme_output.theme_name is \"NO_COHERENT_THEME\", set is_valid_cluster to false and leave other fields as their raw inputs (still return them, do not discard data).\n3. Do NOT generate new insights, new evidence IDs, or new opportunities. You only structure what you were given.\n4. Do NOT resolve disagreements between agents by inventing a synthesis — if the JTBD segment and the Theme description seem to describe different situations, note that plainly in a \"notes\" field rather than papering over it.\n\nOUTPUT — respond with ONLY this JSON, no other text:\n{\n  \"is_valid_cluster\": true,\n  \"theme_name\": \"...\",\n  \"theme_description\": \"...\",\n  \"user_segment\": \"...\",\n  \"core_job\": \"...\",\n  \"trigger\": \"...\",\n  \"opportunity_title\": \"...\",\n  \"opportunity_detail\": \"...\",\n  \"opportunity_scores\": {\"frequency\": 1, \"severity\": 1, \"solvability\": 1},\n  \"sample_evidence_ids\": [\"id1\", \"id2\"],\n  \"notes\": \"any inconsistencies between the three agents, or empty string\"\n}\n",
+          "maxIterations": 3
+        }
+      },
+      "id": "7ffcec92-df96-428d-accf-b5bd0ecd500e",
+      "name": "Orchestrator Synthesizer",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 1.7,
+      "position": [
+        2350,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "model": "claude-sonnet-4-6",
+        "options": {
+          "temperature": 0.1
+        }
+      },
+      "id": "3ea537ed-d911-494b-9c82-0b5ad456282f",
+      "name": "Orchestrator Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.3,
+      "position": [
+        2350,
+        480
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "// Deterministic validation — never trust the LLM to grade itself.\n// 1. Confirms every evidence ID the agents cited actually exists in this cluster.\n// 2. Replaces the theme's evidence_ids with the FULL deterministic cluster\n//    membership (not just the LLM's sample) — this is what satisfies the\n//    blueprint's D.2 eval requirement of >30 evidence reviews per theme.\n// 3. Flags (does not silently drop) any hallucinated IDs for the pipeline_errors log.\n\nconst synthesized = $input.item.json.output ?? $input.item.json; // handle either raw or wrapped agent output\nconst clusterData = $('Prepare Cluster Text').item.json;\n\nlet parsed;\ntry {\n  parsed = typeof synthesized === \"string\" ? JSON.parse(synthesized) : synthesized;\n} catch (e) {\n  return [{\n    json: {\n      cluster_id: clusterData.cluster_id,\n      validation_error: `Failed to parse synthesizer output as JSON: ${e.message}`,\n      raw_output: synthesized\n    }\n  }];\n}\n\nconst validClusterIds = new Set(clusterData.all_cluster_member_ids);\nconst citedIds = parsed.sample_evidence_ids || [];\nconst hallucinatedIds = citedIds.filter(id => !validClusterIds.has(id));\n\nconst result = {\n  ...parsed,\n  cluster_id: clusterData.cluster_id,\n  // Evidence for eval purposes = full deterministic cluster membership, not just LLM sample.\n  evidence_ids: clusterData.all_cluster_member_ids,\n  evidence_count: clusterData.all_cluster_member_ids.length,\n  llm_hallucinated_ids: hallucinatedIds,\n  validation_passed: hallucinatedIds.length === 0\n};\n\nreturn [{ json: result }];\n"
+      },
+      "id": "274a44d7-ec32-4a36-b7b0-22e8550fb077",
+      "name": "Evidence Validator",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2650,
+        340
+      ],
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "amount": 2,
+        "unit": "seconds"
+      },
+      "id": "dac9d3b8-cbe4-489c-8ca7-d75a51821caa",
+      "name": "Rate Limit Pause",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2950,
+        340
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Runs once, after Split In Batches' \"done\" output fires (all clusters processed).\n// Collects every validated theme object emitted so far in this execution.\nconst allItems = $input.all();\nconst themes = allItems.map(item => item.json);\n\nconst validCount = themes.filter(t => t.validation_passed).length;\nconst hallucinationRate = themes.length > 0\n  ? ((themes.length - validCount) / themes.length * 100).toFixed(1)\n  : \"0.0\";\n\nreturn [{\n  json: {\n    generated_at: new Date().toISOString(),\n    total_clusters_processed: themes.length,\n    hallucination_rate_pct: hallucinationRate,\n    themes: themes\n  }\n}];\n"
+      },
+      "id": "86bff566-f00f-484f-97c3-caf7cb943b29",
+      "name": "Aggregate All Results",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        850,
+        620
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "62e81444-2cce-4910-91f3-b467db09bcba",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        1150,
+        620
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook - Receive Clusters": {
+      "main": [
+        [
+          {
+            "node": "Validate & Parse Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Parse Input": {
+      "main": [
+        [
+          {
+            "node": "Loop Clusters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Clusters": {
+      "main": [
+        [
+          {
+            "node": "Aggregate All Results",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Cluster Text",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Cluster Text": {
+      "main": [
+        [
+          {
+            "node": "Theme Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "JTBD Agent",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Opportunity Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Theme Agent Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Theme Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JTBD Agent Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "JTBD Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Opportunity Agent Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Opportunity Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Theme Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait For All Spokes",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "JTBD Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait For All Spokes",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Opportunity Agent": {
+      "main": [
+        [
+          {
+            "node": "Wait For All Spokes",
+            "type": "main",
+            "index": 2
+          }
+        ]
+      ]
+    },
+    "Wait For All Spokes": {
+      "main": [
+        [
+          {
+            "node": "Reshape For Synthesizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Reshape For Synthesizer": {
+      "main": [
+        [
+          {
+            "node": "Orchestrator Synthesizer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Orchestrator Synthesizer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Orchestrator Synthesizer": {
+      "main": [
+        [
+          {
+            "node": "Evidence Validator",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Evidence Validator": {
+      "main": [
+        [
+          {
+            "node": "Rate Limit Pause",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rate Limit Pause": {
+      "main": [
+        [
+          {
+            "node": "Loop Clusters",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate All Results": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "executionTimeout": 300
+  },
+  "staticData": null,
+  "tags": [
+    "blinkit-growth-intel"
+  ],
+  "triggerCount": 1,
+  "updatedAt": "",
+  "versionId": ""
+}

@@ -1,0 +1,356 @@
+:root {
+  --yellow: #F8CB46;
+  --yellow-soft: #FFF3D6;
+  --green: #128A3E;
+  --green-dark: #0D6B2F;
+  --ink: #1A1A1A;
+  --ink-soft: #5A5A5A;
+  --bg-warm: #FFFDF8;
+  --card-bg: #FFFFFF;
+  --border: #EFE9DC;
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: #E8E4DA; /* outer page behind the phone frame */
+  font-family: 'Inter', -apple-system, sans-serif;
+  color: var(--ink);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 32px 12px;
+}
+
+h1, h2, h3, .display {
+  font-family: 'Poppins', 'Inter', sans-serif;
+}
+
+.phone-frame {
+  width: 390px;
+  max-width: 100%;
+  min-height: 780px;
+  background: var(--bg-warm);
+  border-radius: 32px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  overflow: hidden;
+  position: relative;
+  border: 8px solid #111;
+}
+
+.app-scroll {
+  height: 780px;
+  overflow-y: auto;
+  padding-bottom: 24px;
+}
+
+/* --- Header --- */
+.app-header {
+  background: var(--yellow);
+  padding: 16px 16px 14px;
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+.app-header .brand {
+  font-weight: 700;
+  font-size: 18px;
+  letter-spacing: -0.3px;
+}
+
+.app-header .subtitle {
+  font-size: 12px;
+  color: var(--ink);
+  opacity: 0.7;
+  margin-top: 2px;
+}
+
+/* --- Persona switcher --- */
+.persona-row {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 14px 16px 4px;
+  scrollbar-width: none;
+}
+.persona-row::-webkit-scrollbar { display: none; }
+
+.persona-chip {
+  flex: 0 0 auto;
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  cursor: pointer;
+  text-align: left;
+  min-width: 148px;
+  transition: border-color 0.15s, transform 0.1s;
+}
+
+.persona-chip:active { transform: scale(0.98); }
+
+.persona-chip.active {
+  border-color: var(--green);
+  background: #F2FBF5;
+}
+
+.persona-chip .p-name {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+
+.persona-chip .p-meta {
+  font-size: 11px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+/* --- Section labels --- */
+.section-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  padding: 18px 16px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+/* --- Category grid --- */
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 0 16px;
+}
+
+.product-card {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 8px;
+  text-align: center;
+  cursor: pointer;
+  transition: box-shadow 0.15s;
+}
+
+.product-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
+
+.product-card .emoji { font-size: 26px; }
+
+.product-card .p-name {
+  font-size: 11.5px;
+  font-weight: 500;
+  margin-top: 6px;
+  line-height: 1.25;
+  min-height: 28px;
+}
+
+.product-card .p-price {
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 4px;
+  color: var(--ink);
+}
+
+.product-card .add-btn {
+  margin-top: 6px;
+  width: 100%;
+  background: var(--green);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 5px 0;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.product-card .add-btn:active { background: var(--green-dark); }
+
+/* --- Cart panel --- */
+.cart-panel {
+  margin: 16px;
+  background: var(--card-bg);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border);
+  padding: 14px;
+}
+
+.cart-panel h3 {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.cart-item-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  padding: 4px 0;
+}
+
+.cart-empty {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  padding: 6px 0;
+}
+
+.threshold-bar-track {
+  height: 8px;
+  background: var(--border);
+  border-radius: 6px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.threshold-bar-fill {
+  height: 100%;
+  background: var(--green);
+  transition: width 0.3s ease;
+}
+
+.threshold-msg {
+  font-size: 12px;
+  margin-top: 6px;
+  color: var(--ink-soft);
+}
+
+.cart-total-row {
+  display: flex;
+  justify-content: space-between;
+  font-weight: 700;
+  font-size: 14px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+}
+
+/* --- Discovery card --- */
+.discovery-card {
+  margin: 16px;
+  background: var(--yellow-soft);
+  border: 1.5px solid var(--yellow);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  animation: slideUp 0.25s ease;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.discovery-eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--green-dark);
+  margin-bottom: 6px;
+}
+
+.discovery-main {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.discovery-emoji {
+  font-size: 34px;
+  background: white;
+  border-radius: 12px;
+  width: 56px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.discovery-name {
+  font-weight: 700;
+  font-size: 14.5px;
+}
+
+.discovery-reason {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+}
+
+.discovery-price {
+  font-weight: 700;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.why-toggle {
+  background: none;
+  border: none;
+  color: var(--green-dark);
+  font-size: 12px;
+  font-weight: 600;
+  padding: 10px 0 0;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.why-body {
+  font-size: 12px;
+  color: var(--ink-soft);
+  background: white;
+  border-radius: 8px;
+  padding: 10px;
+  margin-top: 8px;
+  line-height: 1.4;
+}
+
+.discovery-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.btn-accept, .btn-dismiss {
+  flex: 1;
+  padding: 10px 0;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+}
+
+.btn-accept {
+  background: var(--green);
+  color: white;
+}
+.btn-accept:active { background: var(--green-dark); }
+
+.btn-dismiss {
+  background: white;
+  color: var(--ink-soft);
+  border: 1px solid var(--border);
+}
+
+.discovery-confirmation {
+  margin: 16px;
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-soft);
+  padding: 20px 0;
+}
+
+/* Accessibility: visible focus rings */
+button:focus-visible, .persona-chip:focus-visible {
+  outline: 2px solid var(--green-dark);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .discovery-card { animation: none; }
+}
