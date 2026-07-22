@@ -1,0 +1,5 @@
+langdetect>=1.0.9
+numpy>=1.26,<3
+hdbscan>=0.8.40
+sentence-transformers>=3.0.0
+supabase>=2.10.0

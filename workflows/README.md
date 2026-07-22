@@ -8,11 +8,41 @@ review analysis workflow" — it needs a public, clickable link.
 ## Import
 
 1. n8n → Workflows → **Import from File** → select `02-theme-extraction.json`
-2. Add your Anthropic credential to **all four** `lmChatAnthropic` nodes
+2. Add your Groq credential (`groqApi`) to **all four** `lmChatGroq` nodes
    (Theme Agent Model, JTBD Agent Model, Opportunity Agent Model, Orchestrator
    Model) — the JSON deliberately ships without credentials, you must attach
-   your own after import
+   your own after import. All four are pinned to `llama-3.3-70b-versatile` —
+   Groq deprecates models over time, so re-verify this is still current at
+   console.groq.com/docs/models before the live run (this couldn't be checked
+   from the build environment — see the Groq migration note below).
 3. Activate the workflow to get its public webhook URL
+
+## Groq migration notes (see docs/GROQ_MIGRATION_AND_FAILPROOFING.md)
+
+- **Rate-limit pacing is now token-aware, not a flat delay.** The old flat
+  2-second `Wait` node is replaced by a new **Compute Rate Limit Pacing**
+  code node (runs right before the Wait node) that estimates tokens used by
+  each cluster's 4 LLM calls from the actual `sample_text` sent, tracks a
+  rolling 60-second window in workflow static data, and computes how long to
+  wait so the window stays under a 6,000 TPM budget (the conservative end of
+  Groq's published 6k-12k range). This is a starting estimate — watch actual
+  token usage on console.groq.com during the first real run and tighten
+  `TPM_BUDGET` in that node if you still hit 429s.
+- **429 handling is best-effort, not full compliance with the doc's ask.**
+  All four `lmChatGroq` nodes have `retryOnFail: true, maxTries: 3,
+  waitBetweenTries: 15000` — n8n's native per-node retry. This is a **fixed**
+  15s interval, not the escalating 10s→30s→60s backoff the migration doc
+  describes — n8n's declarative retry doesn't support escalating delays for
+  LangChain sub-nodes. True escalating backoff would require replacing these
+  four nodes with raw HTTP Request nodes calling Groq's API directly plus a
+  custom retry loop — a bigger rewrite than this pass. If 429s prove to be a
+  real problem in the live run, that's the next thing to build.
+- **Groq Batch API availability could not be checked.** The migration doc
+  flags a 5-minute check (is Batch API free-tier-available, which would
+  sidestep this whole pacing problem for the one-time bulk job) — both
+  `console.groq.com` and `api.groq.com` are blocked by this build
+  environment's egress policy, so this was never verified. Worth checking
+  yourself at console.groq.com before running the full corpus.
 
 ## Before running the full corpus — test with 2 fake clusters first
 
@@ -77,6 +107,7 @@ corpus, not a sign something is fundamentally broken.
   per the blueprint's own rule (Part A, Failure 4): never trust an LLM to
   grade itself. It substring-checks cited IDs against real cluster
   membership and flags (doesn't silently discard) any hallucinated IDs.
-- **Rate limiting:** a 2-second `Wait` node sits between the Evidence
-  Validator and the loop-back to Split In Batches, pacing LLM calls per
-  the blueprint's rate-limit guidance.
+- **Rate limiting:** a token-aware `Compute Rate Limit Pacing` code node
+  plus a `Wait` node sit between the Evidence Validator and the loop-back to
+  Split In Batches, pacing LLM calls against Groq's TPM budget — see the
+  Groq migration notes above for the math and its limitations.

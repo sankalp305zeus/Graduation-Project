@@ -8,21 +8,33 @@
  * fails a guardrail. The frontend does not need to change its contract —
  * this returns the same shape (product + reasoning + evidence) either way.
  *
- * NOT TESTED LIVE from the build sandbox — no network path to your Supabase
- * project or the Anthropic API from there. Test this yourself against real
- * credentials before trusting it in a demo. The guardrails.js module IS
- * unit-tested (see guardrails.test.js, 8/8 passing) since that logic needs
- * no external network call.
+ * NOT TESTED LIVE from this build environment — huggingface.co and
+ * api.groq.com are both blocked by this sandbox's egress policy (403 at the
+ * proxy), so neither the embeddings model nor a real Groq call could be
+ * exercised here. Test this yourself against real credentials before
+ * trusting it in a demo. The guardrails.js module IS unit-tested (see
+ * guardrails.test.js, 8/8 passing) since that logic needs no external
+ * network call.
  */
 import { createClient } from '@supabase/supabase-js'
-import Anthropic from '@anthropic-ai/sdk'
+import Groq from 'groq-sdk'
 import { runGuardrails } from './guardrails.js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_SERVICE_ROLE_KEY // service role, NOT the anon key — this runs server-side only
 )
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY })
+// maxRetries: the SDK auto-retries 429/5xx with exponential backoff (default
+// 2); bumped slightly since a demo-time judge click on this single live call
+// shouldn't fail silently — see docs/GROQ_MIGRATION_AND_FAILPROOFING.md Task B.
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY, maxRetries: 3 })
+
+// Pinned per docs/GROQ_MIGRATION_AND_FAILPROOFING.md ("pin exact model
+// version strings ... never rely on a provider's default"). Groq deprecates
+// models over time — re-verify this is still current at
+// console.groq.com/docs/models before the live demo; this sandbox's egress
+// policy blocks api.groq.com so it could not be checked from here.
+const GROQ_MODEL = 'llama-3.3-70b-versatile'
 
 // Same deterministic logic as the mvp-shell's App.jsx — used as the fallback
 // path when the AI recommendation fails a guardrail, so the user always sees
@@ -133,18 +145,36 @@ Rules:
       })),
     })
 
-    // 5. Call Claude
-    const response = await anthropic.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 300,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userPrompt }],
-    })
+    // 5. Call Groq. Wrapped in its own try/catch — a total call failure
+    //    (network error, timeout, 429 after retries exhausted) must degrade
+    //    to the same deterministic fallback as a guardrail failure, never
+    //    reach the outer catch and 500 the whole request. See
+    //    docs/GROQ_MIGRATION_AND_FAILPROOFING.md's fail-proofing checklist.
+    let messageText
+    try {
+      const response = await groq.chat.completions.create({
+        model: GROQ_MODEL,
+        max_tokens: 300,
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt },
+        ],
+      })
+      messageText = response.choices?.[0]?.message?.content
+    } catch (err) {
+      console.error('recommend.js Groq call failed:', err)
+      const fallback = deterministicFallback(candidateProducts, neverTriedCategories, deficit)
+      return res.status(200).json({
+        product: fallback,
+        reasoning: 'AI recommendation is temporarily unavailable — showing a price-matched suggestion instead.',
+        evidence_ids: [],
+        guardrail_status: 'API_FAILURE_FALLBACK',
+      })
+    }
 
-    const textBlock = response.content.find((b) => b.type === 'text')
     let parsed
     try {
-      parsed = JSON.parse(textBlock.text)
+      parsed = JSON.parse(messageText)
     } catch (e) {
       // Malformed JSON from the model — guardrails.js would also catch this
       // shape issue, but we can't even run it without valid JSON, so fall

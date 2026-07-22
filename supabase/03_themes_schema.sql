@@ -10,7 +10,7 @@ create table if not exists reviews (
   text text not null,
   rating int,
   category text,                     -- assigned during theme labeling, nullable until then
-  embedding vector(1536),            -- text-embedding-3-small dimension
+  embedding vector(384),              -- all-MiniLM-L6-v2 dimension (local sentence-transformers)
   created_at timestamptz not null default now()
 );
 
