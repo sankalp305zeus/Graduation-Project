@@ -55,19 +55,27 @@ def cluster_records(records, min_cluster_size=MIN_CLUSTER_SIZE):
     labels = clusterer.fit_predict(embeddings)
 
     clusters = {}
-    noise_count = 0
+    noise_records = []
     for record, label in zip(records, labels):
         if label == -1:
-            noise_count += 1
+            noise_records.append(record)
             continue  # HDBSCAN's noise points — not assigned to any cluster,
                       # correctly excluded rather than forced into a group
         clusters.setdefault(str(label), []).append(record)
 
-    return clusters, noise_count
+    return clusters, noise_records
 
 
-def to_n8n_payload(clusters):
-    """Matches the schema documented in workflows/README.md's test payload."""
+def to_n8n_payload(clusters, noise_records):
+    """Matches the schema documented in workflows/README.md's test payload.
+
+    `noise_review_ids` is an extra top-level field alongside `clusters` — the
+    n8n webhook's "Validate & Parse Input" node only reads `body.clusters`
+    and ignores unknown fields, so this doesn't affect the live workflow.
+    It exists so noise reviews are durably logged (actual IDs, not just a
+    count) for the row-accounting check in evals/row_accounting_check.py —
+    previously this was only a number printed to stdout and lost otherwise.
+    """
     return {
         'clusters': [
             {
@@ -75,7 +83,8 @@ def to_n8n_payload(clusters):
                 'reviews': [{'id': r['id'], 'text': r['text'], 'rating': r.get('rating')} for r in members],
             }
             for cid, members in clusters.items()
-        ]
+        ],
+        'noise_review_ids': [r['id'] for r in noise_records],
     }
 
 
@@ -92,9 +101,9 @@ def main():
         sys.exit(1)
 
     print(f'Clustering {len(records)} embedded records (min_cluster_size={args.min_cluster_size})...')
-    clusters, noise_count = cluster_records(records, args.min_cluster_size)
+    clusters, noise_records = cluster_records(records, args.min_cluster_size)
 
-    payload = to_n8n_payload(clusters)
+    payload = to_n8n_payload(clusters, noise_records)
 
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -102,7 +111,7 @@ def main():
         json.dump(payload, f, indent=2, ensure_ascii=False)
 
     sizes = [len(c['reviews']) for c in payload['clusters']]
-    print(f'Done. {len(payload["clusters"])} clusters formed, {noise_count} reviews unclustered (noise).')
+    print(f'Done. {len(payload["clusters"])} clusters formed, {len(noise_records)} reviews unclustered (noise).')
     if sizes:
         print(f'Cluster sizes: min={min(sizes)}, max={max(sizes)}, avg={sum(sizes)/len(sizes):.1f}')
     print(f'Wrote n8n-ready payload to {out_path}')

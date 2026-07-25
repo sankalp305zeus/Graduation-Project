@@ -57,5 +57,63 @@ console.log('\nTest 8: PII in reasoning should fail')
 const r8 = runGuardrails({ ...valid, reasoning: 'Call us at 9876543210 for more info.' }, baseContext)
 check('catches PII leak', r8.passed === false && r8.failures.some(f => f.includes('PII_LEAK')))
 
+// --- Adversarial cases ---
+// These probe data-hygiene edge cases rather than LLM hallucination —
+// confirming guardrails.js fails closed (rejects) or documents a known
+// scope limit, never crashes, and never lets a bad recommendation through.
+
+console.log('\nTest 9: category string case-mismatch should fail closed, not crash')
+// Real catalog casing is 'Pet Supplies' (see mvp-shell/src/data/mockProducts.js);
+// this product is seeded with a lowercase category, simulating a data-entry
+// inconsistency between products.category and personas.never_tried.
+const caseMismatchContext = {
+  validProducts: [
+    { id: 'p_pet', name: 'Pet Shampoo', category: 'pet supplies', price: 72 },
+  ],
+  validThemes: [
+    { id: 'th_002', category: 'pet supplies', evidence_ids: ['rev_010'] },
+  ],
+  neverTriedCategories: ['Pet Supplies'], // canonical casing
+}
+const r9 = runGuardrails(
+  { product_id: 'p_pet', reasoning: 'This pet shampoo suits users exploring pet care for the first time.', evidence_ids: ['rev_010'] },
+  caseMismatchContext,
+)
+check(
+  'case-mismatched category fails closed (CATEGORY_VIOLATION), no crash — checkCategoryEligible is case-sensitive by design',
+  r9.passed === false && r9.failures.some(f => f.includes('CATEGORY_VIOLATION')),
+)
+
+console.log('\nTest 10: persona with contradictory always_orders/never_tried data should not crash')
+// guardrails.js's context shape never includes always_orders at all (see
+// recommend.js's guardrail call — only validProducts/validThemes/
+// neverTriedCategories are passed in), so a persona whose always_orders
+// upstream ALSO contains this category is invisible to this check by
+// construction. This documents that scope limit rather than papering over
+// it: guardrails.js can't catch that contradiction, only that it doesn't
+// crash on it. Catching self-contradictory persona data belongs at
+// seed/entry-time validation, not in this guardrail layer.
+const contradictoryPersonaContext = {
+  ...baseContext,
+  neverTriedCategories: ['Personal Care & Beauty'], // same category this (hypothetical) persona also always_orders
+}
+const r10 = runGuardrails(valid, contradictoryPersonaContext)
+check(
+  'does not crash on contradictory persona data (passes its own narrow check; the contradiction itself is out of scope for guardrails.js)',
+  r10.passed === true,
+)
+
+console.log('\nTest 11: empty candidate product list should fail closed, not crash')
+const emptyCandidatesContext = {
+  validProducts: [],
+  validThemes: baseContext.validThemes,
+  neverTriedCategories: baseContext.neverTriedCategories,
+}
+const r11 = runGuardrails(valid, emptyCandidatesContext)
+check(
+  'empty candidate list fails closed (HALLUCINATED_PRODUCT) without crashing on product.category lookup',
+  r11.passed === false && r11.failures.some(f => f.includes('HALLUCINATED_PRODUCT')),
+)
+
 console.log(`\n${passed} passed, ${failed} failed`)
 process.exit(failed > 0 ? 1 : 0)
