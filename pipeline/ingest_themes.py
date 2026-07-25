@@ -14,14 +14,42 @@ category. This script closes that gap with a DETERMINISTIC keyword match
 against theme_name/theme_description/core_job/opportunity fields — no extra
 LLM call, consistent with this project's "never trust an LLM to grade
 itself" pattern used everywhere else (guardrails.js, the Evidence Validator
-node). Themes with zero keyword hits are skipped and reported, not
-guessed — see CATEGORY_KEYWORDS below to extend coverage.
+node).
+
+Tie-breaking and threshold, precisely: the category with the MOST keyword
+hits wins; ties go to whichever category is defined earlier in
+CATEGORY_KEYWORDS (strict `>` comparison, not `>=`). There is currently NO
+minimum hit-count floor — a single incidental keyword match is accepted the
+same as four. Use --dry-run to see each theme's hit_count before trusting
+it; raise a MIN_HIT_COUNT threshold yourself if low-confidence single-hit
+matches turn out to be common noise in real data.
+
+Themes with zero keyword hits are skipped (not guessed) and reported. Their
+member reviews are still inserted into `reviews` with category=NULL —
+reviews.category is nullable specifically for this ("assigned during theme
+labeling, nullable until then", per supabase/03_themes_schema.sql). Clusters
+the Synthesizer itself flagged as NO_COHERENT_THEME are a separate, fully
+skipped case — neither the theme nor its reviews are inserted.
+
+NOTE for Phase 3's coverage_diversity.py: Supabase's `reviews` table is
+NEVER the true full corpus regardless of the above, because cluster.py
+already discards HDBSCAN noise points before clusters.json is built — those
+reviews never reach this script at all. Compute that eval's denominator
+from data/processed/ (cleaned_reviews.jsonl or embedded_reviews.jsonl), not
+from this table.
 
 Requires: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY (NOT the anon key — the
 themes/reviews RLS policies only grant public SELECT, no INSERT; anon-key
 writes fail silently). Set these in pipeline/.env or export them directly.
 
 Usage:
+  python ingest_themes.py --dry-run \
+      --themes-input ../data/processed/n8n_themes_response.json \
+      --reviews-input ../data/processed/embedded_reviews.jsonl
+  # ^ prints every cluster's assigned category + hit_count, no Supabase
+  #   credentials needed and nothing is written — spot-check real output
+  #   against this before the real run.
+
   python ingest_themes.py --themes-input ../data/processed/n8n_themes_response.json \
                            --reviews-input ../data/processed/embedded_reviews.jsonl
 
@@ -149,15 +177,104 @@ def load_reviews_by_id(path):
     return reviews
 
 
+def build_rows(themes, reviews_by_id):
+    """Shared by --dry-run and the real ingest so both see identical logic.
+
+    Returns (theme_rows, review_rows_by_id, skipped_no_category,
+    skipped_invalid_cluster, assignments). `assignments` carries one entry
+    per non-invalid-cluster theme — (cluster_id, category_or_None, hits,
+    theme_name, theme_description) — for the dry-run report.
+    """
+    theme_rows = []
+    review_rows_by_id = {}
+    skipped_no_category = []
+    skipped_invalid_cluster = []
+    assignments = []
+
+    for theme in themes:
+        cluster_id = theme.get('cluster_id')
+
+        if theme.get('theme_name') == 'NO_COHERENT_THEME' or theme.get('is_valid_cluster') is False:
+            skipped_invalid_cluster.append(cluster_id)
+            continue
+
+        category, hits = categorize(theme)
+        evidence_ids = theme.get('evidence_ids', [])  # full deterministic cluster membership, not sample_evidence_ids
+        assignments.append((cluster_id, category, hits, theme.get('theme_name', ''), theme.get('theme_description', '')))
+
+        if category:
+            theme_rows.append({
+                'id': f'theme_{cluster_id}',
+                'category': category,
+                'theme_name': theme.get('theme_name', ''),
+                'description': theme.get('theme_description', ''),
+                'evidence_ids': evidence_ids,
+                'is_placeholder': False,
+            })
+        else:
+            skipped_no_category.append(cluster_id)
+
+        # Reviews are inserted whether or not the theme itself was
+        # categorized — reviews.category is nullable for exactly this case.
+        # This is scoped only to the no-category-match skip above; the
+        # NO_COHERENT_THEME / is_valid_cluster=False skip above still drops
+        # its reviews entirely (a different condition — the discovery
+        # engine itself found no theme there, not just no category bucket).
+        for review_id in evidence_ids:
+            source_review = reviews_by_id.get(review_id)
+            if not source_review:
+                continue  # review referenced by the cluster but missing from embedded corpus — skip, don't fabricate
+            review_rows_by_id[review_id] = {
+                'id': source_review['id'],
+                'source': source_review.get('source', 'unknown'),
+                'text': source_review['text'],
+                'rating': source_review.get('rating'),
+                'category': category,  # None for uncategorized-but-clustered reviews
+                'embedding': source_review.get('embedding'),
+            }
+
+    return theme_rows, review_rows_by_id, skipped_no_category, skipped_invalid_cluster, assignments
+
+
+def run_dry_run(themes_input, reviews_input):
+    with open(themes_input, encoding='utf-8') as f:
+        payload = json.load(f)
+    themes = payload.get('themes', [])
+
+    reviews_by_id = load_reviews_by_id(reviews_input)
+
+    theme_rows, review_rows_by_id, skipped_no_category, skipped_invalid_cluster, assignments = build_rows(themes, reviews_by_id)
+
+    print(f'{"cluster_id":<20} {"category":<28} {"hits":<5} theme_name')
+    print('-' * 100)
+    for cluster_id, category, hits, theme_name, _description in assignments:
+        label = category if category else '(UNMATCHED)'
+        print(f'{str(cluster_id):<20} {label:<28} {hits:<5} {theme_name[:60]}')
+
+    print()
+    print(f'Would ingest {len(theme_rows)} themes, {len(review_rows_by_id)} reviews '
+          f'(including {sum(1 for r in review_rows_by_id.values() if r["category"] is None)} uncategorized).')
+    if skipped_invalid_cluster:
+        print(f'Would fully skip {len(skipped_invalid_cluster)} NO_COHERENT_THEME clusters (theme + reviews): {skipped_invalid_cluster}')
+    if skipped_no_category:
+        print(f'{len(skipped_no_category)} clusters have no category match — their reviews still get category=NULL: {skipped_no_category}')
+    print('\nNothing was written to Supabase (--dry-run).')
+
+
 def main():
     parser = argparse.ArgumentParser(description='Ingest real n8n theme-extraction output into Supabase')
     parser.add_argument('--themes-input', type=str, default='../data/processed/n8n_themes_response.json')
     parser.add_argument('--reviews-input', type=str, default='../data/processed/embedded_reviews.jsonl')
     parser.add_argument('--self-check', action='store_true', help='Verify categorization logic only, no Supabase credentials needed')
+    parser.add_argument('--dry-run', action='store_true', help='Print category assignments for every theme, no Supabase credentials needed, nothing written')
     args = parser.parse_args()
 
     if args.self_check:
         run_self_check()
+        return
+
+    if args.dry_run:
+        run_dry_run(args.themes_input, args.reviews_input)
         return
 
     supabase_url = os.getenv('SUPABASE_URL')
@@ -181,43 +298,7 @@ def main():
 
     reviews_by_id = load_reviews_by_id(args.reviews_input)
 
-    theme_rows = []
-    review_rows_by_id = {}
-    skipped_no_category = []
-    skipped_invalid_cluster = []
-
-    for theme in themes:
-        if theme.get('theme_name') == 'NO_COHERENT_THEME' or theme.get('is_valid_cluster') is False:
-            skipped_invalid_cluster.append(theme.get('cluster_id'))
-            continue
-
-        category, hits = categorize(theme)
-        if not category:
-            skipped_no_category.append(theme.get('cluster_id'))
-            continue
-
-        evidence_ids = theme.get('evidence_ids', [])  # full deterministic cluster membership, not sample_evidence_ids
-        theme_rows.append({
-            'id': f'theme_{theme["cluster_id"]}',
-            'category': category,
-            'theme_name': theme.get('theme_name', ''),
-            'description': theme.get('theme_description', ''),
-            'evidence_ids': evidence_ids,
-            'is_placeholder': False,
-        })
-
-        for review_id in evidence_ids:
-            source_review = reviews_by_id.get(review_id)
-            if not source_review:
-                continue  # review referenced by the cluster but missing from embedded corpus — skip, don't fabricate
-            review_rows_by_id[review_id] = {
-                'id': source_review['id'],
-                'source': source_review.get('source', 'unknown'),
-                'text': source_review['text'],
-                'rating': source_review.get('rating'),
-                'category': category,
-                'embedding': source_review.get('embedding'),
-            }
+    theme_rows, review_rows_by_id, skipped_no_category, skipped_invalid_cluster, _assignments = build_rows(themes, reviews_by_id)
 
     if theme_rows:
         supabase.table('themes').upsert(theme_rows).execute()
@@ -226,10 +307,10 @@ def main():
 
     print(f'Ingested {len(theme_rows)} themes, {len(review_rows_by_id)} reviews.')
     if skipped_invalid_cluster:
-        print(f'Skipped {len(skipped_invalid_cluster)} clusters with no coherent theme: {skipped_invalid_cluster}')
+        print(f'Skipped {len(skipped_invalid_cluster)} clusters with no coherent theme (theme + reviews dropped): {skipped_invalid_cluster}')
     if skipped_no_category:
-        print(f'Skipped {len(skipped_no_category)} clusters — no category keyword match '
-              f'(extend CATEGORY_KEYWORDS or categorize manually): {skipped_no_category}', file=sys.stderr)
+        print(f'{len(skipped_no_category)} clusters had no category keyword match — their reviews were still inserted with category=NULL '
+              f'(extend CATEGORY_KEYWORDS to categorize them): {skipped_no_category}', file=sys.stderr)
 
 
 if __name__ == '__main__':
