@@ -215,9 +215,37 @@ def run_self_check():
     sys.exit(0 if ok else 1)
 
 
+def fetch_live_personas():
+    """Same query ingest_themes.py's write-time gate uses — this lets you
+    run that exact check standalone, without needing real theme/review
+    input files just to validate the live personas table."""
+    import os
+
+    try:
+        from supabase import create_client
+    except ImportError:
+        print('[error] supabase package not installed. Run: pip install -r requirements.txt', file=sys.stderr)
+        sys.exit(1)
+
+    supabase_url = os.getenv('SUPABASE_URL')
+    service_role_key = os.getenv('SUPABASE_SERVICE_ROLE_KEY')
+    if not supabase_url or not service_role_key:
+        print('[error] SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY must both be set '
+              '(the anon key can still read personas, but use the service role key '
+              'for consistency with the ingest-time gate)', file=sys.stderr)
+        sys.exit(1)
+
+    supabase = create_client(supabase_url, service_role_key)
+    rows = supabase.table('personas').select('id, always_orders, never_tried').execute().data or []
+    return rows
+
+
 def main():
     parser = argparse.ArgumentParser(description='Validate persona seed data before it is written anywhere')
     parser.add_argument('--self-check', action='store_true', help='Run synthetic good/bad cases, no files needed')
+    parser.add_argument('--live', action='store_true',
+                         help='Validate the LIVE Supabase personas table instead of the local seed files '
+                              '(requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)')
     args = parser.parse_args()
 
     if args.self_check:
@@ -225,6 +253,22 @@ def main():
         return
 
     violations = []
+
+    if args.live:
+        live_personas = fetch_live_personas()
+        if not live_personas:
+            print('[note] live personas table is empty — nothing to validate')
+            return
+        print(f'Fetched {len(live_personas)} personas from the live Supabase personas table')
+        violations += validate_personas(live_personas, 'supabase.personas (live)')
+
+        if violations:
+            print(f'\nFAILED — {len(violations)} violation(s) in the LIVE personas table:', file=sys.stderr)
+            for v in violations:
+                print(f'  {v}', file=sys.stderr)
+            sys.exit(1)
+        print('\nLive personas table valid: no overlaps, no unknown categories, no duplicates.')
+        return
 
     sql_personas = parse_seed_sql(SEED_SQL_PATH)
     print(f'Parsed {len(sql_personas)} personas from {SEED_SQL_PATH.relative_to(REPO_ROOT)}')
