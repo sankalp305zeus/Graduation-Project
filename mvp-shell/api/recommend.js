@@ -208,8 +208,13 @@ Rules:
       })
     }
 
-    // 7. Passed — return the real AI recommendation
-    const product = candidateProducts.find((p) => p.id === parsed.product_id)
+    // 7. Passed — return the real AI recommendation. Case-insensitive
+    //    lookup to stay consistent with guardrails.js's checkProductExists:
+    //    if the guardrail accepted a case-flipped product_id, an exact-match
+    //    find() here would return undefined — a broken card shipped with
+    //    guardrail_status PASSED, which is worse than any fallback.
+    const normId = (s) => (typeof s === 'string' ? s.trim().toLowerCase() : s)
+    const product = candidateProducts.find((p) => normId(p.id) === normId(parsed.product_id))
     return res.status(200).json({
       product,
       reasoning: parsed.reasoning,

@@ -62,10 +62,12 @@ check('catches PII leak', r8.passed === false && r8.failures.some(f => f.include
 // confirming guardrails.js fails closed (rejects) or documents a known
 // scope limit, never crashes, and never lets a bad recommendation through.
 
-console.log('\nTest 9: category string case-mismatch should fail closed, not crash')
+console.log('\nTest 9: category string case-mismatch should now PASS (case-insensitive compare)')
 // Real catalog casing is 'Pet Supplies' (see mvp-shell/src/data/mockProducts.js);
 // this product is seeded with a lowercase category, simulating a data-entry
 // inconsistency between products.category and personas.never_tried.
+// checkCategoryEligible normalizes both sides, so a legitimate
+// recommendation is no longer wasted on a casing inconsistency.
 const caseMismatchContext = {
   validProducts: [
     { id: 'p_pet', name: 'Pet Shampoo', category: 'pet supplies', price: 72 },
@@ -80,8 +82,26 @@ const r9 = runGuardrails(
   caseMismatchContext,
 )
 check(
-  'case-mismatched category fails closed (CATEGORY_VIOLATION), no crash — checkCategoryEligible is case-sensitive by design',
-  r9.passed === false && r9.failures.some(f => f.includes('CATEGORY_VIOLATION')),
+  'case-mismatched category resolves as eligible (passes) instead of failing closed',
+  r9.passed === true,
+)
+
+console.log('\nTest 9b: LLM echoing product_id with different casing should PASS')
+// checkProductExists had the same exposure: rec.product_id is LLM output,
+// so "P10" for catalog "p10" is a plausible model quirk, not a hallucination.
+const r9b = runGuardrails({ ...valid, product_id: 'P10' }, baseContext)
+check(
+  'case-flipped product_id resolves to the real catalog product (passes)',
+  r9b.passed === true,
+)
+
+console.log('\nTest 9c: a REAL category violation must still fail after normalization')
+// Regression guard: loosening the comparison must not have loosened the
+// actual check — p01 (Groceries) is genuinely not in never_tried.
+const r9c = runGuardrails({ ...valid, product_id: 'p01' }, baseContext)
+check(
+  'genuine category violation still caught (CATEGORY_VIOLATION)',
+  r9c.passed === false && r9c.failures.some(f => f.includes('CATEGORY_VIOLATION')),
 )
 
 console.log('\nTest 10: persona with contradictory always_orders/never_tried data should not crash')
