@@ -292,6 +292,27 @@ def main():
 
     supabase = create_client(supabase_url, service_role_key)
 
+    # Seed-time persona gate: refuse to write ANY theme data while the live
+    # personas table contains contradictory rows (always_orders overlapping
+    # never_tried, unknown/case-drifted categories). guardrails.js can never
+    # see this contradiction at recommendation time (its context has no
+    # always_orders — see guardrails.test.js Test 10), so it must be caught
+    # here. Lazy import avoids a circular import (validate_personas imports
+    # CATEGORY_KEYWORDS from this module).
+    from validate_personas import validate_personas
+    persona_rows = supabase.table('personas').select('id, always_orders, never_tried').execute().data or []
+    if not persona_rows:
+        print('[note] personas table is empty — nothing to validate, continuing')
+    else:
+        persona_violations = validate_personas(persona_rows, 'supabase.personas')
+        if persona_violations:
+            print(f'[error] ABORTING before any write — {len(persona_violations)} persona '
+                  f'violation(s) in the live personas table:', file=sys.stderr)
+            for v in persona_violations:
+                print(f'  {v}', file=sys.stderr)
+            sys.exit(1)
+        print(f'Persona gate passed: {len(persona_rows)} personas, no overlaps or category drift.')
+
     with open(args.themes_input, encoding='utf-8') as f:
         payload = json.load(f)
     themes = payload.get('themes', [])
