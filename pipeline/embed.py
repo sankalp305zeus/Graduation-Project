@@ -45,7 +45,13 @@ BATCH_SIZE = 100  # encode() batches internally, but chunking keeps memory
 
 
 def embed_batch(model, texts):
-    embeddings = model.encode(texts, show_progress_bar=False)
+    # normalize_embeddings=True is required for cluster.py's HDBSCAN step,
+    # which uses metric='euclidean'. For unit vectors, euclidean distance
+    # and cosine similarity are monotonically related (||a-b||^2 = 2 -
+    # 2*cos(a,b)); without normalization, review length dominates distance
+    # instead of meaning. This was the root cause of a real 2029-review run
+    # producing 2 giant clusters (max 814) instead of the expected 50-150.
+    embeddings = model.encode(texts, show_progress_bar=False, normalize_embeddings=True)
     return [emb.tolist() for emb in embeddings]
 
 
