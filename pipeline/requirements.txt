@@ -5,3 +5,4 @@ sentence-transformers>=3.0.0
 supabase>=2.10.0
 python-dotenv>=1.0.0
 groq>=0.11.0
+requests>=2.31.0

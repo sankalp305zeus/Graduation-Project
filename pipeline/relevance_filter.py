@@ -29,13 +29,32 @@ outcome is now recorded with its SOURCE ('llm' = genuine model verdict,
 makes --resume-from possible: a review already classified with source
 'llm' is never re-sent to Groq.
 
-Requires: GROQ_API_KEY. Model pinned to llama-3.3-70b-versatile — same
-model already pinned in mvp-shell/api/recommend.js and the n8n workflow.
-Re-verify at console.groq.com/docs/models before the live run; this
-sandbox's egress policy blocks that site so it could not be checked here.
+PROVIDERS: this script defaults to a LOCAL Ollama model (llama3.2:3b),
+because relevance filtering is a one-time bulk job (~100+ batched calls
+for a 2000-review corpus) that Groq's free-tier daily quota cannot absorb.
+Local inference has no rate limits, so pacing is disabled and retries
+reduce to basic transient-error handling on that path. --provider groq
+still works and keeps the full pacing/backoff machinery. Groq remains the
+default everywhere ELSE in the project (mvp-shell/api/recommend.js, the
+n8n workflow) — this is not a project-wide provider change.
+
+  ollama: needs `ollama serve` running and `ollama pull llama3.2:3b`.
+          A preflight check fails loudly if either is missing, rather than
+          letting every batch degrade to keep-all (a "successful" run that
+          filters nothing). Output is constrained by a JSON schema, since
+          a 3B model drops IDs and malforms JSON far more readily than a
+          70B — and each such slip becomes an unfiltered review.
+  groq:   needs GROQ_API_KEY. Pinned to llama-3.3-70b-versatile, the same
+          model used in recommend.js and the n8n workflow.
 
 Usage:
+  # Default (local Ollama):
   python relevance_filter.py --input ../data/processed/cleaned_reviews.jsonl \
+                              --output ../data/processed/relevant_reviews.jsonl
+
+  # Hosted Groq instead:
+  python relevance_filter.py --provider groq \
+                              --input ../data/processed/cleaned_reviews.jsonl \
                               --output ../data/processed/relevant_reviews.jsonl
 
   # Resume a prior run, reclassifying only what wasn't a genuine verdict:
@@ -69,8 +88,22 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-MODEL = 'llama-3.3-70b-versatile'
+MODEL = 'llama-3.3-70b-versatile'  # Groq path
 BATCH_SIZE = 20
+
+# Local Ollama path — the default for THIS script, because relevance
+# filtering is a one-time bulk job (~100+ batched calls for a 2000-review
+# corpus) that Groq's free tier cannot absorb without constant 429
+# fighting. Groq stays the default everywhere else in the project
+# (mvp-shell/api/recommend.js, the n8n workflow) — this is not a
+# project-wide provider change.
+OLLAMA_MODEL = 'llama3.2:3b'
+OLLAMA_HOST = 'http://localhost:11434'
+OLLAMA_TIMEOUT = 300  # seconds per batch; local inference is slower per call than hosted
+# Smaller default batch than Groq's: llama3.2:3b is a 3B model and degrades
+# noticeably when asked to emit long multi-item JSON, and every dropped ID
+# becomes a kept_via_fallback (unfiltered) review. Override with --batch-size.
+OLLAMA_BATCH_SIZE = 10
 
 # Escalating backoff for when a 429 slips through the proactive pacer
 # anyway (clock drift, another process sharing the same Groq account,
@@ -102,6 +135,31 @@ Respond with ONLY this JSON, no other text, covering EVERY review ID given,
 in any order, never omitting one:
 {"classifications": [{"id": "...", "relevant": true}, {"id": "...", "relevant": false}]}
 """
+
+# Ollama accepts a JSON schema (not just format="json") to constrain output —
+# verified against the ollama package's own type definition:
+#   format: Optional[Union[Literal['', 'json'], JsonSchemaValue]]
+# Worth using: llama3.2:3b is far likelier than a 70B to emit malformed JSON
+# or silently drop review IDs, and both of those degrade to kept_via_fallback,
+# which is exactly the failure that made the first Groq run unusable.
+# Schema-constrained decoding attacks that at the source.
+OLLAMA_FORMAT_SCHEMA = {
+    'type': 'object',
+    'properties': {
+        'classifications': {
+            'type': 'array',
+            'items': {
+                'type': 'object',
+                'properties': {
+                    'id': {'type': 'string'},
+                    'relevant': {'type': 'boolean'},
+                },
+                'required': ['id', 'relevant'],
+            },
+        },
+    },
+    'required': ['classifications'],
+}
 
 
 class RateLimiter:
@@ -154,67 +212,173 @@ def estimate_batch_tokens(batch):
     return input_tokens + output_tokens
 
 
-def build_client():
-    try:
-        from groq import Groq
-    except ImportError:
-        print('[error] groq package not installed. Run: pip install -r requirements.txt', file=sys.stderr)
-        sys.exit(1)
-
-    api_key = os.getenv('GROQ_API_KEY')
-    if not api_key:
-        print('[error] GROQ_API_KEY not set', file=sys.stderr)
-        sys.exit(1)
-
-    # max_retries=0: retry/backoff is handled explicitly by
-    # classify_batch_with_retry below, so we control the exact escalation
-    # rather than let the SDK's own default retrying interfere with timing.
-    return Groq(api_key=api_key, max_retries=0)
+def build_user_payload(batch):
+    return json.dumps([{'id': r['id'], 'text': r['text']} for r in batch])
 
 
-def classify_batch(client, model, batch):
-    """batch: list of {id, text}. Returns ({id: bool}, actual_tokens_or_None).
-    Raises on any request/parse failure — the caller decides retry vs
-    fall back."""
-    user_payload = json.dumps([{'id': r['id'], 'text': r['text']} for r in batch])
-
-    response = client.chat.completions.create(
-        model=model,
-        max_tokens=2000,
-        messages=[
-            {'role': 'system', 'content': SYSTEM_PROMPT},
-            {'role': 'user', 'content': user_payload},
-        ],
-    )
-    text = response.choices[0].message.content
-    parsed = json.loads(text)  # raises json.JSONDecodeError on malformed output
-
+def parse_classifications(text):
+    """Shared by every provider — the response text shape is identical
+    regardless of who produced it. Raises json.JSONDecodeError on malformed
+    output; the retry layer handles that."""
+    parsed = json.loads(text)
     result = {}
     for item in parsed.get('classifications', []):
         if 'id' in item and 'relevant' in item:
             result[item['id']] = bool(item['relevant'])
-
-    usage = getattr(response, 'usage', None)
-    actual_tokens = getattr(usage, 'total_tokens', None) if usage else None
-    return result, actual_tokens
+    return result
 
 
-def classify_batch_with_retry(client, model, batch):
+class GroqProvider:
+    """Hosted Groq. Rate-limited, so it uses proactive pacing + escalating
+    429 backoff."""
+
+    name = 'groq'
+    paced = True
+
+    def __init__(self, model=MODEL):
+        try:
+            from groq import Groq
+        except ImportError:
+            print('[error] groq package not installed. Run: pip install -r requirements.txt', file=sys.stderr)
+            sys.exit(1)
+
+        api_key = os.getenv('GROQ_API_KEY')
+        if not api_key:
+            print('[error] GROQ_API_KEY not set', file=sys.stderr)
+            sys.exit(1)
+
+        # max_retries=0: retry/backoff is handled explicitly by
+        # classify_batch_with_retry below, so we control the exact escalation
+        # rather than let the SDK's own default retrying interfere with timing.
+        self.client = Groq(api_key=api_key, max_retries=0)
+        self.model = model
+
+    @property
+    def rate_limit_exceptions(self):
+        from groq import RateLimitError
+        return (RateLimitError,)
+
+    @property
+    def transient_exceptions(self):
+        from groq import APIConnectionError, InternalServerError
+        return (APIConnectionError, InternalServerError)
+
+    def preflight(self):
+        return  # nothing cheap to check; a bad key surfaces on the first call
+
+    def call(self, batch):
+        """Returns (text, actual_tokens_or_None)."""
+        response = self.client.chat.completions.create(
+            model=self.model,
+            max_tokens=2000,
+            messages=[
+                {'role': 'system', 'content': SYSTEM_PROMPT},
+                {'role': 'user', 'content': build_user_payload(batch)},
+            ],
+        )
+        usage = getattr(response, 'usage', None)
+        actual_tokens = getattr(usage, 'total_tokens', None) if usage else None
+        return response.choices[0].message.content, actual_tokens
+
+
+class OllamaProvider:
+    """Local Ollama over its REST API. No rate limits, so pacing is disabled
+    and retries are basic transient-error handling only (no escalating
+    429 backoff — there are no 429s to escalate against).
+
+    Endpoint/payload/response shape verified against the official ollama
+    python package's own source (POST /api/chat, response.message.content).
+    """
+
+    name = 'ollama'
+    paced = False
+
+    def __init__(self, model, host, timeout):
+        import requests
+
+        self.requests = requests
+        self.model = model
+        self.host = host.rstrip('/')
+        self.timeout = timeout
+        self.session = requests.Session()
+        # Ollama is a local service by definition. If the environment has
+        # HTTP_PROXY set without localhost in no_proxy, requests would try
+        # to tunnel localhost traffic through it and fail confusingly —
+        # bypass proxies explicitly rather than depend on env hygiene.
+        self.session.trust_env = False
+
+    @property
+    def rate_limit_exceptions(self):
+        return ()  # local inference has no rate limit
+
+    @property
+    def transient_exceptions(self):
+        return (self.requests.exceptions.RequestException,)
+
+    def preflight(self):
+        """Fail loudly NOW if Ollama isn't running or the model isn't
+        pulled. Without this, either failure degrades to keep-all on every
+        batch — a 100% fallback rate that looks like a completed run but
+        filters nothing."""
+        try:
+            response = self.session.get(f'{self.host}/api/tags', timeout=10)
+            response.raise_for_status()
+        except self.requests.exceptions.RequestException as e:
+            print(f'[error] cannot reach Ollama at {self.host} ({e}). Is `ollama serve` running?', file=sys.stderr)
+            sys.exit(1)
+
+        available = [m.get('name', '') for m in response.json().get('models', [])]
+        # `ollama list` reports "llama3.2:3b"; tolerate a bare "llama3.2"
+        # being requested against a tagged entry.
+        if not any(m == self.model or m.split(':')[0] == self.model.split(':')[0] for m in available):
+            print(f'[error] model "{self.model}" not found in Ollama. Available: {available or "(none)"}\n'
+                  f'        Pull it first:  ollama pull {self.model}', file=sys.stderr)
+            sys.exit(1)
+        print(f'Ollama preflight OK: {self.host}, model "{self.model}" available')
+
+    def call(self, batch):
+        """Returns (text, None) — token counts are irrelevant with no
+        rate limit to pace against."""
+        response = self.session.post(
+            f'{self.host}/api/chat',
+            json={
+                'model': self.model,
+                'messages': [
+                    {'role': 'system', 'content': SYSTEM_PROMPT},
+                    {'role': 'user', 'content': build_user_payload(batch)},
+                ],
+                'stream': False,
+                'format': OLLAMA_FORMAT_SCHEMA,
+                'options': {'temperature': 0},
+            },
+            timeout=self.timeout,
+        )
+        response.raise_for_status()
+        return response.json()['message']['content'], None
+
+
+def classify_batch_with_retry(provider, batch):
     """Returns ({id: bool} or None, tokens_for_pacing). tokens_for_pacing is
     always a number (actual usage on success, the pre-call estimate on
     total failure) so the rate limiter's window stays meaningful either
-    way."""
-    from groq import APIConnectionError, InternalServerError, RateLimitError
+    way.
 
+    Rate-limit backoff only escalates for providers that actually have
+    rate limits (Groq). For a local provider, rate_limit_exceptions is
+    empty, so only the short transient-error path can ever fire."""
     estimated_tokens = estimate_batch_tokens(batch)
     rate_limit_attempt = 0
     other_attempt = 0
 
+    rate_limit_errors = tuple(provider.rate_limit_exceptions)
+    transient_errors = tuple(provider.transient_exceptions) + (json.JSONDecodeError,)
+
     while True:
         try:
-            result, actual_tokens = classify_batch(client, model, batch)
+            text, actual_tokens = provider.call(batch)
+            result = parse_classifications(text)
             return result, (actual_tokens if actual_tokens is not None else estimated_tokens)
-        except RateLimitError:
+        except rate_limit_errors:
             if rate_limit_attempt >= len(RATE_LIMIT_BACKOFFS):
                 print(f'[error] batch of {len(batch)} exhausted rate-limit retries — '
                       f'falling back to keep-all for this batch', file=sys.stderr)
@@ -223,7 +387,7 @@ def classify_batch_with_retry(client, model, batch):
             print(f'[warn] rate limited — waiting {wait}s (attempt {rate_limit_attempt + 1}/{len(RATE_LIMIT_BACKOFFS)})', file=sys.stderr)
             time.sleep(wait)
             rate_limit_attempt += 1
-        except (APIConnectionError, InternalServerError, json.JSONDecodeError) as e:
+        except transient_errors as e:
             if other_attempt >= len(OTHER_ERROR_BACKOFFS):
                 print(f'[error] batch of {len(batch)} exhausted retries ({e}) — '
                       f'falling back to keep-all for this batch', file=sys.stderr)
@@ -234,12 +398,22 @@ def classify_batch_with_retry(client, model, batch):
             other_attempt += 1
 
 
-def filter_reviews(client, model, reviews, batch_size=BATCH_SIZE, rate_limiter=None):
+class NullRateLimiter:
+    """No-op pacer for providers without rate limits (local Ollama)."""
+
+    def wait_before_batch(self, estimated_tokens):
+        return
+
+    def record(self, tokens):
+        return
+
+
+def filter_reviews(provider, reviews, batch_size=BATCH_SIZE, rate_limiter=None):
     """Returns (kept_reviews, classifications, stats).
     classifications: {id: {'relevant': bool, 'source': 'llm'|'fallback'}} —
     per-review provenance, which is what makes resuming possible."""
     if rate_limiter is None:
-        rate_limiter = RateLimiter()
+        rate_limiter = RateLimiter() if getattr(provider, 'paced', True) else NullRateLimiter()
 
     kept_reviews = []
     classifications = {}
@@ -249,7 +423,7 @@ def filter_reviews(client, model, reviews, batch_size=BATCH_SIZE, rate_limiter=N
         batch = reviews[i:i + batch_size]
 
         rate_limiter.wait_before_batch(estimate_batch_tokens(batch))
-        result, tokens_for_pacing = classify_batch_with_retry(client, model, batch)
+        result, tokens_for_pacing = classify_batch_with_retry(provider, batch)
         rate_limiter.record(tokens_for_pacing)
 
         for review in batch:
@@ -321,18 +495,39 @@ def bootstrap_legacy_ledger(all_reviews, legacy_kept_ids):
     return ledger
 
 
-class _FakeResponse:
-    def __init__(self, content, total_tokens=None):
-        self.choices = [type('C', (), {'message': type('M', (), {'content': content})()})]
-        self.usage = type('U', (), {'total_tokens': total_tokens})() if total_tokens is not None else None
+class _StubProvider:
+    """Mock provider for the self-check — mirrors the real provider
+    interface (call/rate_limit_exceptions/transient_exceptions/paced)."""
+
+    def __init__(self, responses, rate_limit_exc=(), transient_exc=(), paced=True):
+        self._responses = responses  # callable(batch) -> (text, tokens), or raises
+        self._rate_limit_exc = rate_limit_exc
+        self._transient_exc = transient_exc
+        self.paced = paced
+        self.calls = 0
+
+    @property
+    def rate_limit_exceptions(self):
+        return self._rate_limit_exc
+
+    @property
+    def transient_exceptions(self):
+        return self._transient_exc
+
+    def call(self, batch):
+        self.calls += 1
+        return self._responses(batch, self.calls)
 
 
 def run_self_check():
     import httpx
+    import requests
     from groq import APIConnectionError, RateLimitError
     import unittest.mock as mock
 
     fake_request = httpx.Request('POST', 'https://api.groq.com/openai/v1/chat/completions')
+    groq_rl = (RateLimitError,)
+    groq_transient = (APIConnectionError,)
 
     ok = True
 
@@ -341,22 +536,19 @@ def run_self_check():
         print(f'  [{"PASS" if condition else "FAIL"}] {name}')
         ok = ok and condition
 
-    # --- filter_reviews scenarios (mocked client, mocked time.sleep) ---
+    # --- filter_reviews scenarios (stub provider, mocked time.sleep) ---
 
-    class WellFormedClient:
-        class chat:
-            class completions:
-                @staticmethod
-                def create(**kwargs):
-                    return _FakeResponse(json.dumps({
-                        'classifications': [
-                            {'id': 'r1', 'relevant': True},
-                            {'id': 'r2', 'relevant': False},
-                        ],
-                    }), total_tokens=123)
-
+    well_formed = _StubProvider(
+        lambda batch, n: (json.dumps({
+            'classifications': [
+                {'id': 'r1', 'relevant': True},
+                {'id': 'r2', 'relevant': False},
+            ],
+        }), 123),
+        rate_limit_exc=groq_rl, transient_exc=groq_transient,
+    )
     with mock.patch('time.sleep'):
-        kept, classifications, stats = filter_reviews(WellFormedClient(), MODEL, [
+        kept, classifications, stats = filter_reviews(well_formed, [
             {'id': 'r1', 'text': 'I never tried the pharmacy section'},
             {'id': 'r2', 'text': 'App crashed on checkout, 1 star'},
         ])
@@ -365,15 +557,10 @@ def run_self_check():
     expect('classifications ledger tags r1/r2 source=llm',
            classifications['r1']['source'] == 'llm' and classifications['r2']['source'] == 'llm')
 
-    class MalformedClient:
-        class chat:
-            class completions:
-                @staticmethod
-                def create(**kwargs):
-                    return _FakeResponse('not valid json at all')
-
+    malformed = _StubProvider(lambda batch, n: ('not valid json at all', None),
+                              rate_limit_exc=groq_rl, transient_exc=groq_transient)
     with mock.patch('time.sleep'):
-        kept2, classifications2, stats2 = filter_reviews(MalformedClient(), MODEL, [
+        kept2, classifications2, stats2 = filter_reviews(malformed, [
             {'id': 'r3', 'text': 'some review'},
             {'id': 'r4', 'text': 'another review'},
         ])
@@ -382,49 +569,96 @@ def run_self_check():
     expect('classifications ledger tags r3/r4 source=fallback',
            classifications2['r3']['source'] == 'fallback' and classifications2['r4']['source'] == 'fallback')
 
-    class PartialClient:
-        class chat:
-            class completions:
-                @staticmethod
-                def create(**kwargs):
-                    return _FakeResponse(json.dumps({'classifications': [{'id': 'r5', 'relevant': False}]}))
-
+    partial = _StubProvider(
+        lambda batch, n: (json.dumps({'classifications': [{'id': 'r5', 'relevant': False}]}), None),
+        rate_limit_exc=groq_rl, transient_exc=groq_transient,
+    )
     with mock.patch('time.sleep'):
-        kept3, classifications3, stats3 = filter_reviews(PartialClient(), MODEL, [
+        kept3, classifications3, stats3 = filter_reviews(partial, [
             {'id': 'r5', 'text': 'generic complaint'},
             {'id': 'r6', 'text': 'omitted by the model'},
         ])
     expect('missing ID in response: r5 genuinely discarded, r6 kept via fallback',
            {r['id'] for r in kept3} == {'r6'} and stats3 == {'relevant': 0, 'discarded': 1, 'kept_via_fallback': 1})
 
-    call_count = {'n': 0}
+    def flaky(batch, n):
+        if n <= 2:
+            raise RateLimitError('rate limited', response=httpx.Response(429, request=fake_request), body=None)
+        return json.dumps({'classifications': [{'id': 'r7', 'relevant': True}]}), None
 
-    class FlakyThenSuccessClient:
-        class chat:
-            class completions:
-                @staticmethod
-                def create(**kwargs):
-                    call_count['n'] += 1
-                    if call_count['n'] <= 2:
-                        raise RateLimitError('rate limited', response=httpx.Response(429, request=fake_request), body=None)
-                    return _FakeResponse(json.dumps({'classifications': [{'id': 'r7', 'relevant': True}]}))
-
+    flaky_provider = _StubProvider(flaky, rate_limit_exc=groq_rl, transient_exc=groq_transient)
     with mock.patch('time.sleep'):
-        kept4, _c4, stats4 = filter_reviews(FlakyThenSuccessClient(), MODEL, [{'id': 'r7', 'text': 'x'}])
+        kept4, _c4, stats4 = filter_reviews(flaky_provider, [{'id': 'r7', 'text': 'x'}])
     expect('rate-limited twice then succeeds: retried until success, not a premature fallback',
-           call_count['n'] == 3 and {r['id'] for r in kept4} == {'r7'} and stats4['kept_via_fallback'] == 0)
+           flaky_provider.calls == 3 and {r['id'] for r in kept4} == {'r7'} and stats4['kept_via_fallback'] == 0)
 
-    class AlwaysFailsClient:
-        class chat:
-            class completions:
-                @staticmethod
-                def create(**kwargs):
-                    raise APIConnectionError(message='connection refused', request=fake_request)
+    def always_fails(batch, n):
+        raise APIConnectionError(message='connection refused', request=fake_request)
 
     with mock.patch('time.sleep'):
-        kept5, _c5, stats5 = filter_reviews(AlwaysFailsClient(), MODEL, [{'id': 'r8', 'text': 'x'}])
+        kept5, _c5, stats5 = filter_reviews(
+            _StubProvider(always_fails, rate_limit_exc=groq_rl, transient_exc=groq_transient),
+            [{'id': 'r8', 'text': 'x'}])
     expect('persistent failure: exhausts retries, falls back to keep, does not raise',
            {r['id'] for r in kept5} == {'r8'} and stats5['kept_via_fallback'] == 1)
+
+    # --- Ollama provider: payload construction + response parsing ---
+    # Verified against a mocked requests session rather than a live Ollama
+    # (none available in the build environment) — this proves the request
+    # shape and response-field access match the contract read out of the
+    # official ollama package's source.
+
+    captured = {}
+
+    class _FakeHTTPResponse:
+        status_code = 200
+
+        def raise_for_status(self):
+            return
+
+        def json(self):
+            return {'message': {'role': 'assistant', 'content': json.dumps({
+                'classifications': [{'id': 'r9', 'relevant': True}],
+            })}}
+
+    ollama = OllamaProvider(model='llama3.2:3b', host='http://localhost:11434', timeout=300)
+
+    def fake_post(url, json=None, timeout=None):
+        captured['url'] = url
+        captured['payload'] = json
+        captured['timeout'] = timeout
+        return _FakeHTTPResponse()
+
+    ollama.session.post = fake_post
+    text, tokens = ollama.call([{'id': 'r9', 'text': 'never tried the pet section'}])
+
+    expect('ollama: posts to /api/chat on the configured host',
+           captured['url'] == 'http://localhost:11434/api/chat')
+    expect('ollama: payload pins the model, disables streaming, sends system+user messages',
+           captured['payload']['model'] == 'llama3.2:3b'
+           and captured['payload']['stream'] is False
+           and [m['role'] for m in captured['payload']['messages']] == ['system', 'user'])
+    expect('ollama: constrains output with a JSON schema (not just format="json")',
+           captured['payload']['format'] == OLLAMA_FORMAT_SCHEMA)
+    expect('ollama: reads response["message"]["content"], returns no token count',
+           parse_classifications(text) == {'r9': True} and tokens is None)
+    expect('ollama: no rate-limit exceptions declared (nothing to escalate against)',
+           tuple(ollama.rate_limit_exceptions) == ())
+    expect('ollama: paced=False so filter_reviews uses the no-op limiter',
+           ollama.paced is False)
+
+    # A local provider must never take the escalating 10/30/60s rate-limit
+    # path — only the short transient one — even when its calls keep failing.
+    def conn_error(batch, n):
+        raise requests.exceptions.ConnectionError('refused')
+
+    local_failing = _StubProvider(conn_error, rate_limit_exc=(),
+                                  transient_exc=(requests.exceptions.RequestException,), paced=False)
+    with mock.patch('time.sleep') as local_sleep:
+        kept6, _c6, stats6 = filter_reviews(local_failing, [{'id': 'r10', 'text': 'x'}])
+    expect('local provider failure: short transient retries only, no 10/30/60s escalation',
+           [c[0][0] for c in local_sleep.call_args_list] == OTHER_ERROR_BACKOFFS
+           and stats6['kept_via_fallback'] == 1 and {r['id'] for r in kept6} == {'r10'})
 
     # --- RateLimiter: proactive pacing itself ---
 
@@ -507,10 +741,22 @@ def main():
     parser.add_argument('--input', type=str, default='../data/processed/cleaned_reviews.jsonl')
     parser.add_argument('--output', type=str, default='../data/processed/relevant_reviews.jsonl')
     parser.add_argument('--classifications-output', type=str, default='../data/processed/relevance_classifications.jsonl')
-    parser.add_argument('--batch-size', type=int, default=BATCH_SIZE)
+    parser.add_argument('--provider', choices=['groq', 'ollama'], default='ollama',
+                         help='ollama (default for THIS script — local, no rate limits) or groq. '
+                              'Groq remains the default everywhere else in the project '
+                              '(recommend.js, the n8n workflow) — this flag is scoped to this script only.')
+    parser.add_argument('--groq-model', type=str, default=MODEL)
+    parser.add_argument('--ollama-model', type=str, default=OLLAMA_MODEL)
+    parser.add_argument('--ollama-host', type=str, default=OLLAMA_HOST)
+    parser.add_argument('--ollama-timeout', type=int, default=OLLAMA_TIMEOUT,
+                         help='Per-batch read timeout in seconds — local inference on a small model is slower '
+                              'per call than a hosted one, so this is generous by default')
+    parser.add_argument('--batch-size', type=int, default=None,
+                         help=f'Default: {BATCH_SIZE} for groq, {OLLAMA_BATCH_SIZE} for ollama (a 3B model handles '
+                              f'shorter multi-item JSON far more reliably than a 70B)')
     parser.add_argument('--resume-from', type=str, default=None,
                          help='A previous --classifications-output — reviews already classified there with '
-                              'source=llm are carried over, not re-sent to Groq')
+                              'source=llm are carried over, not re-sent to the model')
     parser.add_argument('--bootstrap-legacy-output', type=str, default=None,
                          help='One-off: migrate a run made with the OLD version of this script (a plain kept-only '
                               'JSONL) into a classifications ledger written to --classifications-output, then exit')
@@ -525,6 +771,21 @@ def main():
         run_bootstrap(args.input, args.bootstrap_legacy_output, args.classifications_output)
         return
 
+    if args.provider == 'ollama':
+        provider = OllamaProvider(args.ollama_model, args.ollama_host, args.ollama_timeout)
+        default_batch_size = OLLAMA_BATCH_SIZE
+        model_label = args.ollama_model
+    else:
+        provider = GroqProvider(args.groq_model)
+        default_batch_size = BATCH_SIZE
+        model_label = args.groq_model
+    batch_size = args.batch_size if args.batch_size is not None else default_batch_size
+
+    # Fails loudly and exits if Ollama isn't running or the model isn't
+    # pulled — without it, either failure would degrade to keep-all on
+    # every batch: a "successful" run that filtered nothing.
+    provider.preflight()
+
     with open(args.input, encoding='utf-8') as f:
         reviews = [json.loads(line) for line in f if line.strip()]
     reviews_by_id = {r['id']: r for r in reviews}
@@ -537,9 +798,9 @@ def main():
         print(f'Resuming from {args.resume_from}: {len(carry_over)} reviews carried over '
               f'(genuine prior verdict), {len(to_classify)} need (re)classification')
 
-    client = build_client()
-    print(f'Classifying {len(to_classify)} reviews in batches of {args.batch_size}...')
-    _kept_from_new, new_classifications, stats = filter_reviews(client, MODEL, to_classify, args.batch_size)
+    print(f'Classifying {len(to_classify)} reviews via {provider.name} ({model_label}) '
+          f'in batches of {batch_size}...')
+    _kept_from_new, new_classifications, stats = filter_reviews(provider, to_classify, batch_size)
 
     all_classifications = dict(carry_over)
     all_classifications.update(new_classifications)
