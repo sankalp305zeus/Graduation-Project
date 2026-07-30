@@ -8,41 +8,56 @@ review analysis workflow" — it needs a public, clickable link.
 ## Import
 
 1. n8n → Workflows → **Import from File** → select `02-theme-extraction.json`
-2. Add your Groq credential (`groqApi`) to **all four** `lmChatGroq` nodes
-   (Theme Agent Model, JTBD Agent Model, Opportunity Agent Model, Orchestrator
-   Model) — the JSON deliberately ships without credentials, you must attach
-   your own after import. All four are pinned to `llama-3.3-70b-versatile` —
-   Groq deprecates models over time, so re-verify this is still current at
-   console.groq.com/docs/models before the live run (this couldn't be checked
-   from the build environment — see the Groq migration note below).
+2. Add an **Ollama credential** (`ollamaApi`, Base URL `http://localhost:11434`)
+   to **all four** `lmChatOllama` nodes (Theme Agent Model, JTBD Agent Model,
+   Opportunity Agent Model, Orchestrator Model) — the JSON deliberately ships
+   without credentials, you must attach your own after import. All four are
+   pinned to `llama3.1:latest`.
 3. Activate the workflow to get its public webhook URL
 
-## Groq migration notes (see docs/GROQ_MIGRATION_AND_FAILPROOFING.md)
+**Prerequisites:** `ollama serve` running, and `ollama pull llama3.1:latest`.
 
-- **Rate-limit pacing is now token-aware, not a flat delay.** The old flat
-  2-second `Wait` node is replaced by a new **Compute Rate Limit Pacing**
-  code node (runs right before the Wait node) that estimates tokens used by
-  each cluster's 4 LLM calls from the actual `sample_text` sent, tracks a
-  rolling 60-second window in workflow static data, and computes how long to
-  wait so the window stays under a 6,000 TPM budget (the conservative end of
-  Groq's published 6k-12k range). This is a starting estimate — watch actual
-  token usage on console.groq.com during the first real run and tighten
-  `TPM_BUDGET` in that node if you still hit 429s.
-- **429 handling is best-effort, not full compliance with the doc's ask.**
-  All four `lmChatGroq` nodes have `retryOnFail: true, maxTries: 3,
-  waitBetweenTries: 15000` — n8n's native per-node retry. This is a **fixed**
-  15s interval, not the escalating 10s→30s→60s backoff the migration doc
-  describes — n8n's declarative retry doesn't support escalating delays for
-  LangChain sub-nodes. True escalating backoff would require replacing these
-  four nodes with raw HTTP Request nodes calling Groq's API directly plus a
-  custom retry loop — a bigger rewrite than this pass. If 429s prove to be a
-  real problem in the live run, that's the next thing to build.
-- **Groq Batch API availability could not be checked.** The migration doc
-  flags a 5-minute check (is Batch API free-tier-available, which would
-  sidestep this whole pacing problem for the one-time bulk job) — both
-  `console.groq.com` and `api.groq.com` are blocked by this build
-  environment's egress policy, so this was never verified. Worth checking
-  yourself at console.groq.com before running the full corpus.
+> ⚠️ **If you run n8n in Docker**, `localhost:11434` resolves to the *container*,
+> not your host — the Ollama credential's Base URL must be
+> `http://host.docker.internal:11434` (Mac/Windows) or your host's LAN IP
+> (Linux). Running n8n natively via `npx n8n` keeps `localhost` correct.
+
+## Provider: local Ollama (was Groq)
+
+Theme extraction makes **4 LLM calls per cluster** — at 50-150 clusters
+that's **200-600 calls** for one full run, which exceeds Groq's free-tier
+daily cap (the same cap that already blocked a relevance-filtering run).
+The 4 model nodes therefore run against a **local Ollama** instance.
+
+- **Model is `llama3.1:latest` (8B), not the 3B used by
+  `pipeline/relevance_filter.py`.** That script does binary yes/no
+  classification; these agents do theme naming, JTBD inference, and
+  opportunity scoring, which need real reasoning.
+- **Pacing removed.** The token-aware `Compute Rate Limit Pacing` code node
+  and the `Rate Limit Pause` Wait node are both **deleted** — local
+  inference has no RPM/TPM ceiling to pace against. `Evidence Validator`
+  now loops straight back to `Loop Clusters`.
+- **Retries simplified to basic error handling.** The 4 model nodes keep
+  `retryOnFail: true` but at `maxTries: 2, waitBetweenTries: 5000` — enough
+  to absorb a cold model load or a momentarily busy Ollama, with no
+  escalating 429 backoff since there are no 429s locally.
+- **Expect this run to be slower in wall-clock time than Groq**, since a
+  local 8B model is far slower per call than hosted inference — but it runs
+  unattended with no quota to exhaust.
+- **`mvp-shell/api/recommend.js` stays on Groq** — one call per
+  recommendation is low-volume and unaffected by the daily cap.
+
+### If the agents return unparseable output
+
+`llama3.1:latest` is much smaller than the 70B this workflow was originally
+written against, so malformed JSON is more likely. The `Evidence Validator`
+already handles it gracefully (emits `validation_error` for that cluster and
+keeps going, rather than failing the run). If it happens often, open the 4
+model nodes and set **Options → Output Format → JSON**. That wasn't enabled
+by default deliberately: it couldn't be tested against a live n8n instance
+from the build environment, and if it interfered with the Agent node's own
+output handling it would break *every* cluster — a worse failure than
+occasional parse errors that are already caught and reported.
 
 ## Before running the full corpus — test with 2 fake clusters first
 
@@ -58,6 +73,8 @@ Send this test payload to the webhook before trusting it with real data:
 
 ```json
 {
+  "corpus_total": 100,
+  "corpus_total_basis": "manual_test_payload",
   "clusters": [
     {
       "cluster_id": "test-1",
@@ -78,10 +95,23 @@ Send this test payload to the webhook before trusting it with real data:
 }
 ```
 
+`corpus_total` is included so this test also exercises the prevalence
+path — with 100 as the denominator, `test-1` should come back with
+`prevalence_pct: 3` (3 of 100) and `test-2` with `2`. Omit those two
+top-level fields and the workflow falls back to the 5 reviews in the
+payload, reporting `prevalence_basis:
+"clustered_reviews_in_payload_fallback"` — which is also worth seeing once,
+to confirm the fallback labels itself rather than silently producing a
+percentage of the wrong thing.
+
 **What to check in the n8n execution log after this test run:**
 - Does the loop actually iterate twice (once per cluster) and then stop?
 - Does `Evidence Validator`'s output for `test-1` include all 3 of
   `r1, r2, r3` in `evidence_ids` (not just whatever the LLM sampled)?
+- Is `prevalence_pct` 3 for `test-1` and 2 for `test-2`, with
+  `prevalence_basis: "manual_test_payload"`?
+- Did all four agents return parseable JSON, or is there a
+  `validation_error` (see the unparseable-output note above)?
 - Does the final response include both clusters?
 
 If the loop doesn't terminate, or `Reshape For Synthesizer` errors out, the
@@ -107,7 +137,24 @@ corpus, not a sign something is fundamentally broken.
   per the blueprint's own rule (Part A, Failure 4): never trust an LLM to
   grade itself. It substring-checks cited IDs against real cluster
   membership and flags (doesn't silently discard) any hallucinated IDs.
-- **Rate limiting:** a token-aware `Compute Rate Limit Pacing` code node
-  plus a `Wait` node sit between the Evidence Validator and the loop-back to
-  Split In Batches, pacing LLM calls against Groq's TPM budget — see the
-  Groq migration notes above for the math and its limitations.
+- **No rate limiting.** Removed along with the Groq→Ollama swap — local
+  inference has no quota to pace against. `Evidence Validator` loops
+  directly back to `Loop Clusters`.
+- **Prevalence is computed deterministically, not by the LLM.** Each theme
+  carries `prevalence_pct` — its `evidence_count` as a share of
+  `corpus_total` (supplied by `pipeline/cluster.py` in the webhook payload).
+  This exists because AI severity rankings mislead on their own: review text
+  over-represents angry 1-star writers, so a "severity 5" theme covering
+  0.4% of the corpus is a very different product decision from the same
+  score at 15%. **Always report the two together.** Like `evidence_ids`,
+  this is arithmetic over real cluster membership — not the model's opinion.
+- **The prevalence denominator is always labelled.** `prevalence_basis`
+  travels with every percentage: `embedded_reviews_analyzed` (the default —
+  the post-relevance-filter corpus that was actually clustered),
+  `explicit_--corpus-total` (you passed `cluster.py --corpus-total N`, e.g.
+  the full pre-filter cleaned count), or
+  `clustered_reviews_in_payload_fallback` (no `corpus_total` in the payload
+  at all — an older `clusters.json`, or a hand-written test payload). An
+  unlabelled percentage is precisely the misleading number prevalence is
+  meant to prevent, so the basis is never dropped. If `corpus_total` is
+  missing or zero, `prevalence_pct` is `null` rather than a bogus figure.

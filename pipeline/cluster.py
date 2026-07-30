@@ -66,15 +66,21 @@ def cluster_records(records, min_cluster_size=MIN_CLUSTER_SIZE):
     return clusters, noise_records
 
 
-def to_n8n_payload(clusters, noise_records):
+def to_n8n_payload(clusters, noise_records, corpus_total, corpus_total_basis):
     """Matches the schema documented in workflows/README.md's test payload.
 
-    `noise_review_ids` is an extra top-level field alongside `clusters` — the
-    n8n webhook's "Validate & Parse Input" node only reads `body.clusters`
-    and ignores unknown fields, so this doesn't affect the live workflow.
-    It exists so noise reviews are durably logged (actual IDs, not just a
-    count) for the row-accounting check in evals/row_accounting_check.py —
-    previously this was only a number printed to stdout and lost otherwise.
+    Extra top-level fields alongside `clusters` — the n8n webhook's
+    "Validate & Parse Input" node reads them explicitly now, and older
+    payloads without them still work (the workflow falls back).
+
+    `noise_review_ids`: noise reviews logged by actual ID, not just a count,
+    for evals/row_accounting_check.py.
+
+    `corpus_total` / `corpus_total_basis`: the denominator the workflow uses
+    to compute each theme's prevalence_pct. The BASIS is carried alongside
+    the number deliberately — "% of corpus" is meaningless without saying
+    which corpus, and an unlabeled percentage is exactly the kind of
+    misleading figure prevalence is meant to guard against.
     """
     return {
         'clusters': [
@@ -85,6 +91,8 @@ def to_n8n_payload(clusters, noise_records):
             for cid, members in clusters.items()
         ],
         'noise_review_ids': [r['id'] for r in noise_records],
+        'corpus_total': corpus_total,
+        'corpus_total_basis': corpus_total_basis,
     }
 
 
@@ -93,6 +101,12 @@ def main():
     parser.add_argument('--input', type=str, default='../data/processed/embedded_reviews.jsonl')
     parser.add_argument('--output', type=str, default='../data/processed/clusters.json')
     parser.add_argument('--min-cluster-size', type=int, default=MIN_CLUSTER_SIZE)
+    parser.add_argument('--corpus-total', type=int, default=None,
+                         help='Denominator for each theme\'s prevalence_pct. Defaults to the number of embedded '
+                              'records read from --input (i.e. the post-relevance-filter corpus that was actually '
+                              'analyzed). Pass the full pre-filter cleaned-corpus count here instead if you want '
+                              'prevalence reported against every review scraped — the basis is recorded in the '
+                              'payload either way so the percentage is never ambiguous.')
     args = parser.parse_args()
 
     records = load_embedded_records(args.input)
@@ -103,7 +117,14 @@ def main():
     print(f'Clustering {len(records)} embedded records (min_cluster_size={args.min_cluster_size})...')
     clusters, noise_records = cluster_records(records, args.min_cluster_size)
 
-    payload = to_n8n_payload(clusters, noise_records)
+    if args.corpus_total is not None:
+        corpus_total = args.corpus_total
+        corpus_total_basis = 'explicit_--corpus-total'
+    else:
+        corpus_total = len(records)
+        corpus_total_basis = 'embedded_reviews_analyzed'
+
+    payload = to_n8n_payload(clusters, noise_records, corpus_total, corpus_total_basis)
 
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -114,6 +135,7 @@ def main():
     print(f'Done. {len(payload["clusters"])} clusters formed, {len(noise_records)} reviews unclustered (noise).')
     if sizes:
         print(f'Cluster sizes: min={min(sizes)}, max={max(sizes)}, avg={sum(sizes)/len(sizes):.1f}')
+    print(f'Prevalence denominator: corpus_total={corpus_total} (basis: {corpus_total_basis})')
     print(f'Wrote n8n-ready payload to {out_path}')
     print('This file is POST-able directly to the 02-theme-extraction.json webhook.')
 
