@@ -69,9 +69,27 @@ and the shipped wiring (0 → Aggregate All Results, 1 → Prepare Cluster Text)
 is correct for `typeVersion: 3`. If the workflow finishes instantly, that is
 *not* the cause — see the Code node mode note below.
 
-Still genuinely unverified: the **Wait For All Spokes** merge node's exact
-output shape, which the **Reshape For Synthesizer** code node has an inline
-comment about adjusting if needed.
+### Wait For All Spokes — merge mode (fixed)
+
+This node previously carried `combinationMode: "mergeByPosition"`, a **Merge
+v2 parameter name**. Merge v3 ignores it and falls back to `combineBy`'s
+default, `combineByFields`, which (a) demands "Fields to Match" — the runtime
+error — and (b) does not offer `numberInputs`, so the node renders only **2**
+inputs and Opportunity Agent's connection to input index 2 has nowhere to
+land. `numberInputs: 3` was set correctly in the JSON all along; the mode
+just wasn't one that honours it.
+
+It is now `mode: "append"`, which **does** support `numberInputs` and
+concatenates inputs in index order (`append.js`:
+`returnData.push.apply(returnData, inputsData[i])`). So the node emits
+**one item per spoke**: `[0]` Theme, `[1]` JTBD, `[2]` Opportunity, and
+`Reshape For Synthesizer` maps them positionally.
+
+> ⚠️ **Do not "simplify" this to `combineByPosition`.** All three spokes emit
+> the same key (`output`), and combineByPosition's default clash rule keeps
+> only the **last** input — Opportunity Agent would silently overwrite Theme
+> and JTBD, discarding two-thirds of every cluster's analysis with no error.
+> `validate_workflow.mjs` fails the build if anyone sets it.
 
 ### Code node execution mode (fixed)
 

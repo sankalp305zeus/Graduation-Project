@@ -75,6 +75,54 @@ for (const node of wf.nodes.filter((n) => n.type === 'n8n-nodes-base.splitInBatc
   else pass(`${node.name}: output 0 (done) -> ${done.join(', ')}`);
 }
 
+// Merge v3 (MergeV3 actions/mode/index.js, helpers/descriptions.js):
+//   - parameter is `combineBy` (default 'combineByFields'), NOT the v2 name
+//     `combinationMode`. A stale v2 name is silently ignored, so the node
+//     falls back to combineByFields and demands "Fields to Match".
+//   - `numberInputs` is only offered by append / chooseBranch /
+//     combineByPosition / combineBySql. In any other mode the node renders
+//     exactly 2 inputs, so a 3rd wired connection lands nowhere.
+console.log('\nMerge v3 mode vs wired inputs:');
+const NUMBER_INPUTS_MODES = new Set(['append', 'chooseBranch', 'combineByPosition', 'combineBySql']);
+for (const node of wf.nodes.filter((n) => n.type === 'n8n-nodes-base.merge')) {
+  if (node.typeVersion !== 3) { fail(`${node.name}: expected typeVersion 3, got ${node.typeVersion}`); continue; }
+  const p = node.parameters ?? {};
+
+  for (const stale of ['combinationMode', 'mergeByFields', 'joinMode', 'propertyName1', 'propertyName2']) {
+    if (stale in p) fail(`${node.name}: "${stale}" is a Merge v2 parameter — v3 ignores it and silently falls back to its default`);
+  }
+
+  // Effective mode: `mode`, refined by `combineBy` when mode is 'combine'.
+  const effectiveMode = p.mode === 'combine' ? (p.combineBy ?? 'combineByFields') : (p.mode ?? 'append');
+
+  // Highest input index actually wired into this node, across the whole graph.
+  let maxIndex = -1;
+  for (const conns of Object.values(wf.connections)) {
+    for (const group of Object.values(conns)) {
+      for (const list of group ?? []) {
+        for (const c of list ?? []) {
+          if (c.node === node.name) maxIndex = Math.max(maxIndex, c.index ?? 0);
+        }
+      }
+    }
+  }
+  const wiredInputs = maxIndex + 1;
+
+  if (wiredInputs > 2 && !NUMBER_INPUTS_MODES.has(effectiveMode)) {
+    fail(`${node.name}: ${wiredInputs} inputs wired but mode "${effectiveMode}" only supports 2 ` +
+         `(numberInputs is offered by: ${[...NUMBER_INPUTS_MODES].join(', ')})`);
+  } else if (wiredInputs > (p.numberInputs ?? 2)) {
+    fail(`${node.name}: ${wiredInputs} inputs wired but numberInputs=${p.numberInputs ?? 2}`);
+  } else {
+    pass(`${node.name}: mode "${effectiveMode}", ${wiredInputs} inputs wired, numberInputs=${p.numberInputs ?? 2}`);
+  }
+
+  if (effectiveMode === 'combineByPosition') {
+    fail(`${node.name}: combineByPosition merges same-named keys and keeps only the LAST input by ` +
+         `default — unsafe when inputs share a key (all agent nodes emit "output"). Prefer append.`);
+  }
+}
+
 console.log('\nGraph integrity:');
 const names = new Set(wf.nodes.map((n) => n.name));
 let dangling = 0;

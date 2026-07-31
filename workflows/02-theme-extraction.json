@@ -170,8 +170,7 @@
     },
     {
       "parameters": {
-        "mode": "combine",
-        "combinationMode": "mergeByPosition",
+        "mode": "append",
         "numberInputs": 3,
         "options": {}
       },
@@ -182,12 +181,13 @@
       "position": [
         1800,
         340
-      ]
+      ],
+      "notes": "mode=append: emits one item per spoke, in input order (input 0 Theme, 1 JTBD, 2 Opportunity). Do NOT switch to combineByPosition — all three spokes emit the key `output`, and its default clash rule keeps only the LAST input."
     },
     {
       "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Reshapes the 3 merged spoke outputs into one object the Synthesizer agent can read.\nconst merged = $input.first().json;\nreturn [{\n  json: {\n    theme_output: merged.output ?? merged['0'] ?? merged,\n    jtbd_output: merged['1'] ?? null,\n    opportunity_output: merged['2'] ?? null\n  }\n}];\n// NOTE: exact merged-item shape depends on your n8n version's merge node output format.\n// Inspect one execution in the n8n UI and adjust field access here if needed."
+        "jsCode": "// Reshapes the 3 merged spoke outputs into one object the Synthesizer reads.\n//\n// \"Wait For All Spokes\" runs in mode=append, so this node receives ONE ITEM\n// PER SPOKE, in input order — verified against n8n-nodes-base\n// Merge/v3/actions/mode/append.js, which concatenates inputsData in index\n// order. So: [0] = Theme Agent (input 0), [1] = JTBD (1), [2] = Opportunity (2).\n// This is why append was chosen over combineByPosition: all three spokes\n// emit the same `output` key, and combineByPosition's default clash rule\n// keeps only the LAST input, silently discarding two of the three.\n\nconst items = $input.all();\n\n// Agent nodes wrap their reply as { output: ... }; fall back to the raw json\n// if a future n8n version stops wrapping it.\nconst unwrap = (item) => {\n  if (!item) return null;\n  const j = item.json ?? {};\n  return j.output ?? j;\n};\n\n// Map positionally rather than by key. Missing spokes become null instead of\n// throwing: a node error would halt the whole run mid-corpus, and one flaky\n// spoke shouldn't cost the other 50-150 clusters. spokes_received makes any\n// shortfall visible downstream rather than silent.\nreturn [{\n  json: {\n    theme_output: unwrap(items[0]),\n    jtbd_output: unwrap(items[1]),\n    opportunity_output: unwrap(items[2]),\n    spokes_received: items.length\n  }\n}];\n"
       },
       "id": "c3d63d0e-194d-45f0-9192-8b2f8628ebd6",
       "name": "Reshape For Synthesizer",
