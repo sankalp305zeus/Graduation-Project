@@ -73,20 +73,39 @@ Still genuinely unverified: the **Wait For All Spokes** merge node's exact
 output shape, which the **Reshape For Synthesizer** code node has an inline
 comment about adjusting if needed.
 
-### Code node execution mode (fixed — cause of a silent instant "success")
+### Code node execution mode (fixed)
 
-Every Code node here returns an **array** of items, which n8n only permits in
-**Run Once for All Items** mode — and that is the Code node's default when
-`mode` is unset (confirmed in `Code.node.js`; the each-item validator
-explicitly rejects array returns with *"please use the 'Run Once for All
-Items' mode instead"*).
+Every Code node now runs in **`runOnceForAllItems`**, explicitly set, with
+all-items accessors and array returns. A Code node's `mode`, input accessor
+and return shape must agree or n8n fails it at runtime — the three legal
+combinations, from `n8n-nodes-base` source:
 
-The nodes originally read their input with `$input.item` / `$(node).item`,
-which are the **Run Once for Each Item** APIs and don't exist in all-items
-mode. That failed at the *first* Code node after the webhook — presenting as
-an execution that ends in milliseconds with only the Webhook node ticked.
-All five nodes now use `$input.first()` / `$(node).first()`, which is exact
-here because `batchSize` is 1, so the loop's current item is the only item.
+| mode | input accessor | return shape |
+|---|---|---|
+| `runOnceForAllItems` | `$input.all()` / `.first()` / `.last()` | array of `{json:…}` |
+| `runOnceForEachItem` | `$input.item`, `$(node).item` | a single `{json:…}`, **never** an array |
+
+The mismatch caused two failed imports. All-items is the only legal mode
+here because **Validate & Parse Input** fans one webhook item out into N
+cluster items, and each-item mode rejects array returns outright
+(*"please use the 'Run Once for All Items' mode instead"*); **Aggregate All
+Results** likewise needs `$input.all()` to collect every loop iteration.
+Making all five uniform removes the whole class of mismatch.
+
+### Verify before importing
+
+Two checks run offline — no n8n, no Ollama, no credentials:
+
+```bash
+node workflows/validate_workflow.mjs   # mode/accessor/return + loop wiring + graph
+node workflows/test_code_nodes.mjs     # executes each Code node against mocked $input/$
+```
+
+`validate_workflow.mjs` encodes the rules above plus the verified
+SplitInBatches v3 output indices, and is tested to actually catch both
+real failure modes (an each-item node returning an array, and an unwired
+loop output). Run both after editing the workflow JSON — they would have
+caught both of the failed imports before they happened.
 
 Send this test payload to the webhook before trusting it with real data:
 
