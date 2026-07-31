@@ -61,13 +61,32 @@ occasional parse errors that are already caught and reported.
 
 ## Before running the full corpus — test with 2 fake clusters first
 
-The **Loop Clusters** node (`n8n-nodes-base.splitInBatches`) has a note
-attached flagging that its exact output-index behavior (which output is
-"done" vs "loop") should be verified against your n8n version's UI — I
-built it against standard convention (output 0 = done, output 1 = loop)
-but couldn't test it live. Same caution applies to the **Wait For All
-Spokes** merge node's exact output shape, which the **Reshape For
-Synthesizer** code node has an inline comment about adjusting if needed.
+**Loop Clusters output indices — now VERIFIED, do not swap.** Read out of
+the `n8n-nodes-base` SplitInBatchesV3 source: `outputNames: ['done','loop']`,
+and `execute()` returns `[processedItems, []]` when no items remain vs
+`[[], returnItems]` while looping. So **output 0 = done, output 1 = loop**,
+and the shipped wiring (0 → Aggregate All Results, 1 → Prepare Cluster Text)
+is correct for `typeVersion: 3`. If the workflow finishes instantly, that is
+*not* the cause — see the Code node mode note below.
+
+Still genuinely unverified: the **Wait For All Spokes** merge node's exact
+output shape, which the **Reshape For Synthesizer** code node has an inline
+comment about adjusting if needed.
+
+### Code node execution mode (fixed — cause of a silent instant "success")
+
+Every Code node here returns an **array** of items, which n8n only permits in
+**Run Once for All Items** mode — and that is the Code node's default when
+`mode` is unset (confirmed in `Code.node.js`; the each-item validator
+explicitly rejects array returns with *"please use the 'Run Once for All
+Items' mode instead"*).
+
+The nodes originally read their input with `$input.item` / `$(node).item`,
+which are the **Run Once for Each Item** APIs and don't exist in all-items
+mode. That failed at the *first* Code node after the webhook — presenting as
+an execution that ends in milliseconds with only the Webhook node ticked.
+All five nodes now use `$input.first()` / `$(node).first()`, which is exact
+here because `batchSize` is 1, so the loop's current item is the only item.
 
 Send this test payload to the webhook before trusting it with real data:
 
