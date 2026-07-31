@@ -20,7 +20,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// Validates the incoming webhook payload before entering the loop.\n// Expects: { \"clusters\": [ { \"cluster_id\": \"...\", \"reviews\": [ {id, text, rating}, ... ] }, ... ] }\nconst body = $input.item.json.body;\n\nif (!body || !Array.isArray(body.clusters)) {\n  throw new Error(\n    \"Invalid payload: expected { clusters: [ { cluster_id, reviews: [...] }, ... ] }. \" +\n    \"Got: \" + JSON.stringify(body).slice(0, 200)\n  );\n}\n\nif (body.clusters.length === 0) {\n  throw new Error(\"Payload has zero clusters — nothing to process.\");\n}\n\n// Split In Batches expects one item per array entry, so return each cluster as its own item.\nreturn body.clusters.map(cluster => ({ json: cluster }));\n"
+        "jsCode": "// Validates the incoming webhook payload before entering the loop.\n// Expects: { \"clusters\": [ { \"cluster_id\": \"...\", \"reviews\": [ {id, text, rating}, ... ] }, ... ] }\n// Optionally: \"corpus_total\" + \"corpus_total_basis\" (written by pipeline/cluster.py)\n// — the denominator for each theme's prevalence_pct.\nconst body = $input.item.json.body;\n\nif (!body || !Array.isArray(body.clusters)) {\n  throw new Error(\n    \"Invalid payload: expected { clusters: [ { cluster_id, reviews: [...] }, ... ] }. \" +\n    \"Got: \" + JSON.stringify(body).slice(0, 200)\n  );\n}\n\nif (body.clusters.length === 0) {\n  throw new Error(\"Payload has zero clusters — nothing to process.\");\n}\n\n// Prevalence denominator. Prefer what cluster.py sent; otherwise fall back\n// to the reviews present in this payload and SAY SO via the basis field —\n// an unlabeled percentage is exactly the misleading figure prevalence is\n// meant to prevent.\nlet corpusTotal = Number(body.corpus_total);\nlet corpusTotalBasis = body.corpus_total_basis || \"unspecified\";\nif (!Number.isFinite(corpusTotal) || corpusTotal <= 0) {\n  corpusTotal = body.clusters.reduce((sum, c) => sum + (c.reviews || []).length, 0);\n  corpusTotalBasis = \"clustered_reviews_in_payload_fallback\";\n}\n\n// Split In Batches expects one item per array entry, so return each cluster as its own item.\n// corpus_total rides along on every item so it survives the loop.\nreturn body.clusters.map(cluster => ({\n  json: { ...cluster, corpus_total: corpusTotal, corpus_total_basis: corpusTotalBasis }\n}));\n"
       },
       "id": "9cb9bd0d-1df2-42aa-892e-9a17c37cab5b",
       "name": "Validate & Parse Input",
@@ -49,7 +49,7 @@
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// Runs once per loop iteration (one cluster).\n// Samples up to 8 reviews for the LLM, but keeps the FULL cluster membership\n// separately — this is what fixes the evidence_ids problem: the LLM only\n// needs a readable sample to name the theme, but eval-grade evidence_ids\n// come from deterministic cluster membership, not from what the LLM read.\n\nconst cluster = $input.item.json;\nconst allReviews = cluster.reviews || [];\n\nif (allReviews.length === 0) {\n  throw new Error(`Cluster ${cluster.cluster_id} has zero reviews — check upstream clustering output.`);\n}\n\nconst sample = allReviews.slice(0, 8);\n\nconst formattedText = sample\n  .map(r => `[${r.id}] (rating: ${r.rating ?? \"n/a\"}) ${r.text}`)\n  .join(\"\\n\\n\");\n\nreturn [{\n  json: {\n    cluster_id: cluster.cluster_id,\n    sample_text: formattedText,\n    sample_ids: sample.map(r => r.id),\n    all_cluster_member_ids: allReviews.map(r => r.id),   // full evidence set, deterministic\n    all_cluster_reviews: allReviews                        // kept for the evidence validator step\n  }\n}];\n"
+        "jsCode": "// Runs once per loop iteration (one cluster).\n// Samples up to 8 reviews for the LLM, but keeps the FULL cluster membership\n// separately — this is what fixes the evidence_ids problem: the LLM only\n// needs a readable sample to name the theme, but eval-grade evidence_ids\n// come from deterministic cluster membership, not from what the LLM read.\n\nconst cluster = $input.item.json;\nconst allReviews = cluster.reviews || [];\n\nif (allReviews.length === 0) {\n  throw new Error(`Cluster ${cluster.cluster_id} has zero reviews — check upstream clustering output.`);\n}\n\nconst sample = allReviews.slice(0, 8);\n\nconst formattedText = sample\n  .map(r => `[${r.id}] (rating: ${r.rating ?? \"n/a\"}) ${r.text}`)\n  .join(\"\\n\\n\");\n\nreturn [{\n  json: {\n    cluster_id: cluster.cluster_id,\n    sample_text: formattedText,\n    sample_ids: sample.map(r => r.id),\n    all_cluster_member_ids: allReviews.map(r => r.id),   // full evidence set, deterministic\n    all_cluster_reviews: allReviews,                       // kept for the evidence validator step\n    corpus_total: cluster.corpus_total,                    // carried through for prevalence_pct\n    corpus_total_basis: cluster.corpus_total_basis\n  }\n}];\n"
       },
       "id": "5dadc2f6-d163-41f4-a92a-0f2af172744f",
       "name": "Prepare Cluster Text",
@@ -79,23 +79,22 @@
     },
     {
       "parameters": {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama3.1:latest",
         "options": {
-          "temperature": 0.2,
-          "maxTokensToSample": 500
+          "temperature": 0.2
         }
       },
       "id": "937be767-1558-450b-9f40-2833822ab450",
       "name": "Theme Agent Model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
       "typeVersion": 1,
       "position": [
         1450,
         200
       ],
       "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 15000
+      "maxTries": 2,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -116,23 +115,22 @@
     },
     {
       "parameters": {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama3.1:latest",
         "options": {
-          "temperature": 0.2,
-          "maxTokensToSample": 500
+          "temperature": 0.2
         }
       },
       "id": "4a9967f2-0a64-451c-a354-3f971a7361b1",
       "name": "JTBD Agent Model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
       "typeVersion": 1,
       "position": [
         1450,
         480
       ],
       "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 15000
+      "maxTries": 2,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -153,23 +151,22 @@
     },
     {
       "parameters": {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama3.1:latest",
         "options": {
-          "temperature": 0.2,
-          "maxTokensToSample": 500
+          "temperature": 0.2
         }
       },
       "id": "1b27eba9-26a9-4cdf-8a98-dae5ced290b2",
       "name": "Opportunity Agent Model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
       "typeVersion": 1,
       "position": [
         1450,
         760
       ],
       "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 15000
+      "maxTries": 2,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
@@ -220,28 +217,27 @@
     },
     {
       "parameters": {
-        "model": "llama-3.3-70b-versatile",
+        "model": "llama3.1:latest",
         "options": {
-          "temperature": 0.1,
-          "maxTokensToSample": 500
+          "temperature": 0.1
         }
       },
       "id": "3ea537ed-d911-494b-9c82-0b5ad456282f",
       "name": "Orchestrator Model",
-      "type": "@n8n/n8n-nodes-langchain.lmChatGroq",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
       "typeVersion": 1,
       "position": [
         2350,
         480
       ],
       "retryOnFail": true,
-      "maxTries": 3,
-      "waitBetweenTries": 15000
+      "maxTries": 2,
+      "waitBetweenTries": 5000
     },
     {
       "parameters": {
         "mode": "runOnceForEachItem",
-        "jsCode": "// Deterministic validation — never trust the LLM to grade itself.\n// 1. Confirms every evidence ID the agents cited actually exists in this cluster.\n// 2. Replaces the theme's evidence_ids with the FULL deterministic cluster\n//    membership (not just the LLM's sample) — this is what satisfies the\n//    blueprint's D.2 eval requirement of >30 evidence reviews per theme.\n// 3. Flags (does not silently drop) any hallucinated IDs for the pipeline_errors log.\n\nconst synthesized = $input.item.json.output ?? $input.item.json; // handle either raw or wrapped agent output\nconst clusterData = $('Prepare Cluster Text').item.json;\n\nlet parsed;\ntry {\n  parsed = typeof synthesized === \"string\" ? JSON.parse(synthesized) : synthesized;\n} catch (e) {\n  return [{\n    json: {\n      cluster_id: clusterData.cluster_id,\n      validation_error: `Failed to parse synthesizer output as JSON: ${e.message}`,\n      raw_output: synthesized\n    }\n  }];\n}\n\nconst validClusterIds = new Set(clusterData.all_cluster_member_ids);\nconst citedIds = parsed.sample_evidence_ids || [];\nconst hallucinatedIds = citedIds.filter(id => !validClusterIds.has(id));\n\nconst result = {\n  ...parsed,\n  cluster_id: clusterData.cluster_id,\n  // Evidence for eval purposes = full deterministic cluster membership, not just LLM sample.\n  evidence_ids: clusterData.all_cluster_member_ids,\n  evidence_count: clusterData.all_cluster_member_ids.length,\n  llm_hallucinated_ids: hallucinatedIds,\n  validation_passed: hallucinatedIds.length === 0\n};\n\nreturn [{ json: result }];\n"
+        "jsCode": "// Deterministic validation — never trust the LLM to grade itself.\n// 1. Confirms every evidence ID the agents cited actually exists in this cluster.\n// 2. Replaces the theme's evidence_ids with the FULL deterministic cluster\n//    membership (not just the LLM's sample) — this is what satisfies the\n//    blueprint's D.2 eval requirement of >30 evidence reviews per theme.\n// 3. Flags (does not silently drop) any hallucinated IDs for the pipeline_errors log.\n// 4. Computes prevalence_pct deterministically — how common this theme\n//    actually is, so severity scores are never read without it. The LLM's\n//    severity/frequency scores are its own opinion of a sampled handful of\n//    reviews; prevalence is arithmetic over real cluster membership.\n\nconst synthesized = $input.item.json.output ?? $input.item.json; // handle either raw or wrapped agent output\nconst clusterData = $('Prepare Cluster Text').item.json;\n\nlet parsed;\ntry {\n  parsed = typeof synthesized === \"string\" ? JSON.parse(synthesized) : synthesized;\n} catch (e) {\n  return [{\n    json: {\n      cluster_id: clusterData.cluster_id,\n      validation_error: `Failed to parse synthesizer output as JSON: ${e.message}`,\n      raw_output: synthesized\n    }\n  }];\n}\n\nconst validClusterIds = new Set(clusterData.all_cluster_member_ids);\nconst citedIds = parsed.sample_evidence_ids || [];\nconst hallucinatedIds = citedIds.filter(id => !validClusterIds.has(id));\n\nconst evidenceCount = clusterData.all_cluster_member_ids.length;\nconst corpusTotal = Number(clusterData.corpus_total);\nconst prevalencePct = Number.isFinite(corpusTotal) && corpusTotal > 0\n  ? Number(((evidenceCount / corpusTotal) * 100).toFixed(2))\n  : null;\n\nconst result = {\n  ...parsed,\n  cluster_id: clusterData.cluster_id,\n  // Evidence for eval purposes = full deterministic cluster membership, not just LLM sample.\n  evidence_ids: clusterData.all_cluster_member_ids,\n  evidence_count: evidenceCount,\n  // Prevalence: what share of the analyzed corpus this theme covers. Report\n  // this NEXT TO any severity/frequency score — a high-severity theme at\n  // 0.4% prevalence is a very different product decision than the same\n  // severity at 15%, and angry 1-star reviewers are over-represented in\n  // review text relative to how common their experience is.\n  prevalence_pct: prevalencePct,\n  prevalence_basis: clusterData.corpus_total_basis || \"unspecified\",\n  corpus_total: Number.isFinite(corpusTotal) ? corpusTotal : null,\n  llm_hallucinated_ids: hallucinatedIds,\n  validation_passed: hallucinatedIds.length === 0\n};\n\nreturn [{ json: result }];\n"
       },
       "id": "274a44d7-ec32-4a36-b7b0-22e8550fb077",
       "name": "Evidence Validator",
@@ -255,22 +251,8 @@
     },
     {
       "parameters": {
-        "amount": "={{ $json.wait_seconds }}",
-        "unit": "seconds"
-      },
-      "id": "dac9d3b8-cbe4-489c-8ca7-d75a51821caa",
-      "name": "Rate Limit Pause",
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        3100,
-        340
-      ]
-    },
-    {
-      "parameters": {
         "mode": "runOnceForAllItems",
-        "jsCode": "// Runs once, after Split In Batches' \"done\" output fires (all clusters processed).\n// Collects every validated theme object emitted so far in this execution.\nconst allItems = $input.all();\nconst themes = allItems.map(item => item.json);\n\nconst validCount = themes.filter(t => t.validation_passed).length;\nconst hallucinationRate = themes.length > 0\n  ? ((themes.length - validCount) / themes.length * 100).toFixed(1)\n  : \"0.0\";\n\nreturn [{\n  json: {\n    generated_at: new Date().toISOString(),\n    total_clusters_processed: themes.length,\n    hallucination_rate_pct: hallucinationRate,\n    themes: themes\n  }\n}];\n"
+        "jsCode": "// Runs once, after Split In Batches' \"done\" output fires (all clusters processed).\n// Collects every validated theme object emitted so far in this execution.\nconst allItems = $input.all();\nconst themes = allItems.map(item => item.json);\n\nconst validCount = themes.filter(t => t.validation_passed).length;\nconst hallucinationRate = themes.length > 0\n  ? ((themes.length - validCount) / themes.length * 100).toFixed(1)\n  : \"0.0\";\n\n// Echo the prevalence denominator once at the top level so any downstream\n// consumer (pipeline/ingest_themes.py, the deck) can see what the\n// per-theme prevalence_pct values are a percentage OF.\nconst firstWithCorpus = themes.find(t => typeof t.corpus_total === \"number\");\n\nreturn [{\n  json: {\n    generated_at: new Date().toISOString(),\n    total_clusters_processed: themes.length,\n    hallucination_rate_pct: hallucinationRate,\n    corpus_total: firstWithCorpus ? firstWithCorpus.corpus_total : null,\n    prevalence_basis: firstWithCorpus ? firstWithCorpus.prevalence_basis : \"unspecified\",\n    themes: themes\n  }\n}];\n"
       },
       "id": "86bff566-f00f-484f-97c3-caf7cb943b29",
       "name": "Aggregate All Results",
@@ -294,19 +276,6 @@
       "position": [
         1150,
         620
-      ]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Token-aware rate-limit pacing — replaces the flat 2s Wait node.\n// Estimates tokens used by THIS cluster's 4 LLM calls (Theme, JTBD,\n// Opportunity, Orchestrator Synthesizer) from the actual sample_text sent,\n// tracks a rolling 60s token window in workflow static data, and computes\n// how long to wait before the next cluster so the rolling window stays\n// under TPM_BUDGET. See docs/GROQ_MIGRATION_AND_FAILPROOFING.md for the\n// math this is based on (~2,800-4,400 tokens/cluster against a 6k-12k TPM\n// range) — these are starting estimates, not guarantees. Watch actual token\n// usage on console.groq.com during the first real run and tighten\n// TPM_BUDGET down if you still hit 429s.\n\nconst TPM_BUDGET = 6000;              // conservative end of Groq's published range\nconst CHARS_PER_TOKEN = 4;            // rough estimate for English text\nconst OVERHEAD_TOKENS_PER_CALL = 400; // system prompt + JSON scaffolding, per call\n\nconst clusterData = $('Prepare Cluster Text').item.json;\nconst sampleText = clusterData.sample_text || '';\nconst sampleTokens = Math.ceil(sampleText.length / CHARS_PER_TOKEN);\n\n// Theme, JTBD, and Opportunity agents each read the full sample_text once.\n// The Orchestrator instead reads the smaller combined JSON of their 3\n// outputs — approximate its cost as one more overhead-sized call rather\n// than a full sample_text re-read.\nconst estimatedTokensThisCluster =\n  (sampleTokens + OVERHEAD_TOKENS_PER_CALL) * 3   // Theme + JTBD + Opportunity\n  + OVERHEAD_TOKENS_PER_CALL * 2;                 // Orchestrator in + out\n\nconst staticData = $getWorkflowStaticData('global');\nif (!staticData.tokenWindow) staticData.tokenWindow = [];\n\nconst now = Date.now();\n// Drop entries older than the 60s rolling window.\nstaticData.tokenWindow = staticData.tokenWindow.filter((e) => now - e.ts < 60000);\n\nconst tokensInWindow = staticData.tokenWindow.reduce((sum, e) => sum + e.tokens, 0);\nconst projectedTotal = tokensInWindow + estimatedTokensThisCluster;\n\nlet waitSeconds = 5; // floor — always leave breathing room between clusters\nif (projectedTotal > TPM_BUDGET) {\n  // Rough conversion: assume tokens arrived evenly across the window, so\n  // waiting (excess / TPM_BUDGET) * 60s lets enough of the window roll off.\n  const excess = projectedTotal - TPM_BUDGET;\n  waitSeconds = Math.max(waitSeconds, Math.ceil((excess / TPM_BUDGET) * 60));\n}\nwaitSeconds = Math.min(waitSeconds, 90); // sanity cap\n\nstaticData.tokenWindow.push({ ts: now, tokens: estimatedTokensThisCluster });\n\nreturn [{\n  json: {\n    ...$input.item.json,\n    wait_seconds: waitSeconds,\n  },\n}];\n"
-      },
-      "id": "8f1c9a2e-6b3d-4e5a-9c7f-1a2b3c4d5e6f",
-      "name": "Compute Rate Limit Pacing",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2800,
-        340
       ]
     }
   ],
@@ -486,17 +455,6 @@
       "main": [
         [
           {
-            "node": "Compute Rate Limit Pacing",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Rate Limit Pause": {
-      "main": [
-        [
-          {
             "node": "Loop Clusters",
             "type": "main",
             "index": 0
@@ -509,17 +467,6 @@
         [
           {
             "node": "Respond to Webhook",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Compute Rate Limit Pacing": {
-      "main": [
-        [
-          {
-            "node": "Rate Limit Pause",
             "type": "main",
             "index": 0
           }
