@@ -85,5 +85,28 @@ const agg = runNode('Aggregate All Results', {
 check('aggregate: surfaces corpus_total + basis at top level', agg.corpus_total === 1000 && agg.prevalence_basis === 'embedded_reviews_analyzed');
 check('aggregate: hallucination rate still computed', agg.hallucination_rate_pct === '50.0');
 
+
+// --- Reshape For Synthesizer: append-mode shape (3 items, input order) ---
+const spokes = [
+  { json: { output: { theme_name: 'Distrust of electronics returns', sample_evidence_ids: ['r1'] } } },
+  { json: { output: { core_job: 'buy reliable essentials', user_segment: 'grocery-only' } } },
+  { json: { output: { opportunity_title: 'One-tap returns', frequency_score: 3 } } },
+];
+let rs = runNode('Reshape For Synthesizer', { item: spokes[0], all: spokes })[0].json;
+check('reshape: maps input order -> theme/jtbd/opportunity (no key collision)',
+  rs.theme_output.theme_name === 'Distrust of electronics returns' &&
+  rs.jtbd_output.core_job === 'buy reliable essentials' &&
+  rs.opportunity_output.opportunity_title === 'One-tap returns');
+check('reshape: records spokes_received for auditability', rs.spokes_received === 3);
+
+// A missing spoke must degrade to null, not throw and halt the whole corpus run.
+rs = runNode('Reshape For Synthesizer', { item: spokes[0], all: spokes.slice(0, 2) })[0].json;
+check('reshape: missing 3rd spoke -> null + visible count, does not throw',
+  rs.opportunity_output === null && rs.spokes_received === 2);
+
+// Unwrapped agent output (no .output envelope) still passes through.
+rs = runNode('Reshape For Synthesizer', { item: spokes[0], all: [{ json: { theme_name: 'raw' } }] })[0].json;
+check('reshape: tolerates un-enveloped agent json', rs.theme_output.theme_name === 'raw');
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
