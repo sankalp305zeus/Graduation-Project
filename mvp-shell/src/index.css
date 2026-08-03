@@ -59,6 +59,9 @@ h1, h2, h3, .display {
 }
 
 .app-header .brand {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   font-weight: 700;
   font-size: 18px;
   letter-spacing: -0.3px;
@@ -141,7 +144,30 @@ h1, h2, h3, .display {
 
 .product-card:hover { box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 
-.product-card .emoji { font-size: 26px; }
+/* --- Icon tiles (lucide icons in a rounded colour chip) --- */
+.icon-tile {
+  width: 40px;
+  height: 40px;
+  border-radius: 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.icon-tile.sm {
+  width: 22px;
+  height: 22px;
+  border-radius: 7px;
+}
+
+.icon-tile.lg {
+  width: 56px;
+  height: 56px;
+  border-radius: 14px;
+}
+
+.product-card .icon-tile { margin: 0 auto; }
 
 .product-card .p-name {
   font-size: 11.5px;
@@ -189,8 +215,16 @@ h1, h2, h3, .display {
 .cart-item-row {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   font-size: 13px;
   padding: 4px 0;
+}
+
+.cart-item-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .cart-empty {
@@ -245,12 +279,44 @@ h1, h2, h3, .display {
 }
 
 .discovery-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
   font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
   color: var(--green-dark);
-  margin-bottom: 6px;
+  margin-bottom: 4px;
+}
+
+.discovery-headline {
+  font-family: 'Poppins', 'Inter', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  line-height: 1.2;
+}
+
+.discovery-subline {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-top: 4px;
+  margin-bottom: 12px;
+  line-height: 1.4;
+}
+
+.discovery-deficit {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid var(--yellow);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink);
+  white-space: nowrap;
 }
 
 .discovery-main {
@@ -259,16 +325,9 @@ h1, h2, h3, .display {
   align-items: center;
 }
 
-.discovery-emoji {
-  font-size: 34px;
+.discovery-main .icon-tile.lg {
   background: white;
-  border-radius: 12px;
-  width: 56px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
 }
 
 .discovery-name {
@@ -309,6 +368,35 @@ h1, h2, h3, .display {
   line-height: 1.4;
 }
 
+.why-body p { margin: 0; }
+
+.why-theme {
+  font-weight: 700;
+  font-size: 12.5px;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.why-evidence {
+  margin-top: 6px;
+  font-size: 11.5px;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+/* Honesty marker: this evidence is seeded, not scraped. Deliberately styled
+   as a warning, not decoration — it must not be skimmed past. */
+.evidence-flag {
+  margin-top: 8px;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #FDF3E3;
+  border: 1px solid #E8CFA0;
+  color: #8A5B12;
+  font-size: 10.5px;
+  font-weight: 600;
+}
+
 .discovery-actions {
   display: flex;
   gap: 8px;
@@ -343,6 +431,115 @@ h1, h2, h3, .display {
   font-size: 13px;
   color: var(--ink-soft);
   padding: 20px 0;
+}
+
+/* --- Category journey (SIMULATED projection, not telemetry) --- */
+.journey-card {
+  margin: 0 16px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px;
+}
+
+.journey-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.journey-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.journey-sim-badge {
+  flex: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #F1EEE6;
+  border: 1px solid #DED8C9;
+  color: var(--ink-soft);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.journey-track {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 4px;
+}
+
+.journey-step {
+  position: relative;
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: center;
+}
+
+/* Connector drawn per-step rather than as one rail, so it always terminates
+   at the outer dots' centres regardless of how many markers there are. */
+.journey-step:not(:first-child)::before {
+  content: '';
+  position: absolute;
+  top: 13px;
+  right: 50%;
+  left: -50%;
+  height: 2px;
+  background: var(--border);
+}
+
+.journey-dot {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  margin: 0 auto;
+  box-shadow: 0 0 0 3px var(--card-bg);
+}
+
+.journey-step.is-latest .journey-dot {
+  box-shadow: 0 0 0 3px var(--card-bg), 0 0 0 5px var(--green);
+}
+
+.journey-month {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  margin-top: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.journey-cat {
+  font-size: 10px;
+  line-height: 1.25;
+  color: var(--ink);
+  margin-top: 2px;
+  overflow-wrap: anywhere;
+}
+
+.journey-tag {
+  margin-top: 5px;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--green-dark);
+}
+
+.journey-note {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--border);
+  font-size: 10.5px;
+  line-height: 1.4;
+  color: var(--ink-soft);
 }
 
 /* Accessibility: visible focus rings */

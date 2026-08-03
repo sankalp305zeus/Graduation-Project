@@ -1,8 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
+import { ShoppingCart } from 'lucide-react'
 import PersonaSwitcher from './components/PersonaSwitcher'
 import CategoryGrid from './components/CategoryGrid'
 import CartPanel from './components/CartPanel'
 import DiscoveryCard from './components/DiscoveryCard'
+import CategoryJourney from './components/CategoryJourney'
 import { fetchPersonas, fetchProducts, logEvent, isConfigured } from './supabaseClient'
 
 const FREE_DELIVERY_THRESHOLD = 199
@@ -100,7 +102,10 @@ export default function App() {
     <div className="phone-frame">
       <div className="app-scroll">
         <div className="app-header">
-          <div className="brand">🛒 QuickCart</div>
+          <div className="brand">
+            <ShoppingCart size={19} strokeWidth={2.5} aria-hidden="true" />
+            QuickCart
+          </div>
           <div className="subtitle">
             Discovery Concierge prototype{!isConfigured && ' — mock data (Supabase not connected)'}
           </div>
@@ -127,6 +132,10 @@ export default function App() {
             onDismiss={handleDismiss}
           />
         )}
+
+        {/* Sits below the discovery card. Illustrative projection only — the
+            component labels itself as such, see CategoryJourney.jsx. */}
+        <CategoryJourney persona={persona} recommendedCategory={recommendation?.category ?? null} />
       </div>
     </div>
   )
