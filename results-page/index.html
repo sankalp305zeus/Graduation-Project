@@ -1,0 +1,399 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Extraction Complete — Theme Extraction Results</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --text: #101418;
+    --secondary: #5B6672;
+    --bg: #FAFAF7;
+    --accent: #F8CB46;
+    --positive: #0E7C66;
+    --risk: #C2410C;
+    --divider: #E3E0D8;
+    --surface: #FFFFFF;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 16pt;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 40px 28px 64px; }
+
+  /* ---------- Header ---------- */
+  .page-head { border-bottom: 1px solid var(--divider); padding-bottom: 24px; margin-bottom: 36px; }
+  h1 { font-size: 28pt; font-weight: 700; letter-spacing: -0.4px; margin: 0 0 10px; line-height: 1.15; }
+  .timestamp { font-size: 14pt; color: var(--secondary); margin: 0; }
+  .run-meta { font-size: 14pt; color: var(--secondary); margin: 6px 0 0; }
+
+  h2 {
+    font-size: 20pt; font-weight: 600; letter-spacing: -0.2px;
+    margin: 0 0 18px;
+  }
+
+  /* ---------- Agent cards ---------- */
+  .agents { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 44px; }
+  .agent-card {
+    background: var(--surface);
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    padding: 20px;
+    display: flex; flex-direction: column; gap: 10px;
+  }
+  .agent-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+  .agent-name { font-size: 16pt; font-weight: 600; line-height: 1.3; }
+  .agent-job { font-size: 14pt; color: var(--secondary); margin: 0; }
+  .agent-status {
+    display: inline-flex; align-items: center; gap: 6px;
+    color: var(--positive); font-size: 14pt; font-weight: 600;
+    flex: none;
+  }
+
+  /* ---------- Theme cards ---------- */
+  .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+  .theme-card {
+    background: var(--surface);
+    border: 1px solid var(--divider);
+    border-radius: 10px;
+    padding: 20px;
+    display: flex; flex-direction: column;
+  }
+  .theme-name { font-size: 17pt; font-weight: 600; line-height: 1.28; margin: 0 0 8px; }
+  .theme-desc { font-size: 14pt; color: var(--secondary); margin: 0 0 14px; }
+
+  .badges { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: var(--accent);
+    color: var(--text);
+    font-size: 14pt; font-weight: 600;
+    padding: 3px 10px; border-radius: 999px;
+    white-space: nowrap;
+  }
+  .badge-quiet {
+    background: transparent;
+    border: 1px solid var(--divider);
+    color: var(--secondary);
+    font-weight: 500;
+  }
+
+  .snippet {
+    border-left: 2px solid var(--divider);
+    padding: 2px 0 2px 12px;
+    margin: 0 0 10px;
+    font-size: 14pt;
+    color: var(--secondary);
+  }
+  .snippet-meta { display: block; margin-top: 4px; font-size: 14pt; color: var(--secondary); opacity: 0.8; }
+
+  details.evidence { margin-top: auto; padding-top: 12px; border-top: 1px solid var(--divider); }
+  details.evidence > summary {
+    display: flex; align-items: center; gap: 6px;
+    cursor: pointer; list-style: none;
+    font-size: 14pt; font-weight: 600; color: var(--text);
+  }
+  details.evidence > summary::-webkit-details-marker { display: none; }
+  details.evidence > summary:focus-visible { outline: 2px solid var(--positive); outline-offset: 3px; border-radius: 4px; }
+  details.evidence[open] .chev { transform: rotate(180deg); }
+  .chev { transition: transform 0.15s ease; flex: none; }
+  .id-list {
+    margin: 12px 0 0; padding: 0; list-style: none;
+    display: flex; flex-wrap: wrap; gap: 6px;
+    max-height: 180px; overflow-y: auto;
+  }
+  .id-list li {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 14pt;
+    color: var(--secondary);
+    background: var(--bg);
+    border: 1px solid var(--divider);
+    border-radius: 5px;
+    padding: 1px 7px;
+  }
+
+  /* ---------- Footer ---------- */
+  .validator {
+    margin-top: 44px; padding-top: 24px;
+    border-top: 1px solid var(--divider);
+    display: flex; align-items: flex-start; gap: 12px;
+  }
+  .validator-body { flex: 1; }
+  .validator-line { font-size: 16pt; font-weight: 600; margin: 0; }
+  .validator-note { font-size: 14pt; color: var(--secondary); margin: 6px 0 0; }
+  .ok { color: var(--positive); }
+  .flag { color: var(--risk); }
+
+  .empty {
+    border: 1px dashed var(--divider); border-radius: 10px;
+    padding: 28px; text-align: center; color: var(--secondary); font-size: 16pt;
+  }
+
+  @media (max-width: 860px) {
+    .agents { grid-template-columns: 1fr; }
+    .wrap { padding: 28px 18px 48px; }
+    h1 { font-size: 24pt; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="page-head">
+    <h1>Extraction Complete</h1>
+    <p class="timestamp" id="timestamp">—</p>
+    <p class="run-meta" id="run-meta"></p>
+  </header>
+
+  <section aria-labelledby="agents-heading">
+    <h2 id="agents-heading">Agents</h2>
+    <div class="agents" id="agents"></div>
+  </section>
+
+  <section aria-labelledby="themes-heading">
+    <h2 id="themes-heading">Extracted themes</h2>
+    <div class="themes" id="themes"></div>
+  </section>
+
+  <footer class="validator" id="validator"></footer>
+</div>
+
+<script id="extraction-data" type="application/json">/* DATA:START */
+{"generated_at":"2026-07-31T14:53:49.341Z","corpus_total":1180,"prevalence_basis":"embedded_reviews_analyzed","total_clusters_processed":15,"validator":{"themes_total":15,"themes_passed":15,"hallucinated_ids_total":0,"hallucination_rate_pct":"0.0"},"themes":[{"cluster_id":"cluster_4","theme_name":"Hidden or unexpected charges","theme_description":"Customers are complaining about being charged extra fees without clear transparency, often only revealed during checkout or after the order is placed.","user_segment":"price-sensitive repeat buyer","core_job":"complete a purchase without unexpected additional costs","opportunity_title":"Transparently Display Cart and Bill Details","evidence_count":67,"prevalence_pct":5.68,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14348973419","as_14345992492","as_14345203506","as_14343045440","as_14342477367","as_14341491963","as_14340557517","as_14338251594","as_14332813696","as_14329449676","as_14328963764","as_14326509546","as_14320820377","as_14318443786","as_14315318141","as_14315215648","ps_9fbd241f-a75d-4bf7-9de2-dc764af475c2","ps_4a516ecb-0f49-4b94-b442-6f631b36bd4d","ps_f792bf8c-d67d-46c7-82db-cedb7310b125","ps_5e5bcf28-1fb8-4a01-b864-1f47e4814b98","ps_8804f55b-2212-4d35-a270-1bcfb15f12b3","ps_f087a04a-9c50-4449-ae3c-fe4257e7dbad","ps_5858b74a-d709-45ee-bc9c-a32d09ea7216","ps_154453d5-70ba-4bc2-94af-a5462f176668","ps_e9daae0c-575e-4104-98bd-d988e8ea839d","ps_8c06ec0a-8ae4-442f-aa40-8e1f80c9390b","ps_e44cc065-610a-44a9-acf7-82710685921b","ps_4ced2bf0-d538-4f3d-8091-47375034f1fc","ps_3a70422a-bfe2-4e3c-a073-864d96f59dff","ps_1e9feac7-b561-4a24-ac38-c8a268e25e61","ps_39269a97-9abe-44d1-a4a3-63ea8963b404","ps_8eeaa78b-254c-464a-a849-da0239cbc83e","ps_f1e55dc2-23cd-492a-a2c2-a459e91a3c1d","ps_48ccf894-7845-43ac-8322-295ec2502168","ps_ca4eab0c-c16d-41d7-a399-74748b620a4f","ps_a80c7434-8e10-4cdf-ab38-6eff78080bc5","ps_0fe20b32-e9f7-4765-a5d2-0e6686997c1e","ps_e5ae8a0c-00cd-44c8-be06-fa6e6f0aaae7","ps_6fa00e79-b173-4cbc-95b6-868ec8290ccd","ps_2cddbd8c-a45e-406e-8c3c-2d4430e4b15c","ps_d58f98eb-c15e-4c31-a965-20178ef246de","ps_e738333d-9b7a-49ac-bbf4-bb1c2a1eabce","ps_a07d95f1-bd79-4485-b586-ad541ac5fb54","ps_7daa3c3f-0841-46c8-81fd-98d57248b2ca","ps_e976f9c4-4894-49f4-bd79-054fee7a1a65","ps_7098423e-da7d-4c1e-a663-adedaac22f82","ps_22bd32fc-c058-4e62-b412-b036d506fe31","ps_0405cb3e-606e-48e9-b7f4-42761c056280","ps_62463c24-e3ce-4ffc-8070-93aead6943bf","ps_f1a65857-d0ea-4679-add6-9f0eff842386","ps_c72d8488-c831-49f1-a18a-c2b73f573a36","ps_a2dd5182-5894-4f81-9d89-1b4aea093026","ps_2ef45c45-64a6-4522-a378-3a1b809ddef7","ps_be39197c-168d-4ffd-8891-20c551803c85","ps_81d9f014-eba4-485c-af0b-75e949b4bc35","ps_4dc5b634-0799-4298-8aa7-2408b2412352","ps_101fedc2-fcc6-442a-92e2-854954cd85eb","ps_e99a4714-9302-4cad-90c9-3cd03ca4386a","ps_59f1bf40-58b2-46e2-b943-07b758c924fb","ps_33e4d86d-08af-4a03-a2c2-fb6c32545e05","ps_b5975745-b64c-4725-b5a1-14c87ee4ff2e","ps_76ef4d0a-b2e8-423e-a508-4573d58fa5aa","ps_75359c7c-2210-423e-89ec-6d799b7458bd","ps_968e07c9-9a7b-4bd9-a281-8769fcf79e33","ps_fe6d2cf3-32c7-46c8-ae9c-2b2e207b153b","ps_e52c6ac0-3d6a-4984-830e-9fe6069fd605","ps_093508a6-7d5e-4383-9068-a41d399f2dd0"],"snippets":[{"id":"as_14348973419","text":"When the customer taps on order the cart and bill details with delivery charges if any should be transparently shown to the customer and not to the payment page directly","truncated":false,"rating":3,"source":"appstore"},{"id":"as_14343045440","text":"While proceeding for final checkout they never show the bill preview so that no one can see the hidden charges they will apply post order. We were usually making 2-3 orders per day then finally we noticed this fishy thing and this will be t…","truncated":true,"rating":1,"source":"appstore"}]},{"cluster_id":"cluster_18","theme_name":"excellent customer experience","theme_description":"Users praise Blinkit's convenience, reliability, and helpful services, making their lives easier.","user_segment":"frequent grocery-only shopper","core_job":"get essentials delivered quickly and conveniently","opportunity_title":"Improve Free Ambulance Service Communication","evidence_count":51,"prevalence_pct":4.32,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14351195174","as_14347017648","as_14329980518","as_14326928550","as_14324468638","as_14323403968","as_14322712444","as_14320963639","as_14317913916","as_14317442155","as_14315562510","as_14315092153","ps_72766385-0356-4cac-9965-915725a93356","ps_6b359d5d-27a6-4bbe-b031-58b49f098f6f","ps_fea6f3c3-6147-4928-92d0-75dfb8961e00","ps_5f1555a4-732c-422a-9714-82d7222abc6b","ps_2e5038f5-7714-4c58-8615-bd5f08aba635","ps_c4f911a9-3e42-4f6e-8064-f72b375f1c49","ps_4997d15d-796d-46fe-9e64-f387b02976b5","ps_7f7cb24c-5a8d-4cf6-9397-3a698476a853","ps_b3989eaa-da00-4a27-9137-ae11b64f29b7","ps_73434478-497a-4123-b66f-cb64bd0cbf9d","ps_b186b986-aaba-434b-aaf5-09d145bcf7aa","ps_c8589534-2051-4214-ab1c-5bd6ede2fdc5","ps_d2804083-d429-4f87-85e8-019851014c99","ps_9d7081dc-957f-484d-b86a-b87a93a20a7d","ps_7fec7bc8-1dc5-4b12-b05b-65f2c9a4f863","ps_b2fca3e9-6b5b-4f3f-999d-edcbde609d0a","ps_76b6b119-8d15-494f-8a6c-d1af52d80907","ps_618fa668-177c-4199-879f-2240eb302ba3","ps_fb6d3b50-d670-4682-97b7-af2b6296f9b3","ps_0de6cb54-33a3-446e-b6c0-a41a985eee57","ps_3297eabe-e750-4975-9b20-686efd4506ab","ps_46ec71ea-566d-4792-ab29-3b4c4cf7cf7e","ps_afd949a4-c986-4352-90a8-e627f679071c","ps_cd3d9792-3aec-46a1-9e2d-88326ff0d006","ps_7a294a2f-9918-4271-a899-126cbcdc8b0e","ps_7b7ad159-39fa-441c-9793-f0659094b46b","ps_f57d1db1-3fbd-43ac-a7a9-d5cc06b9b8ef","ps_e02bade8-850a-4a24-8c5d-0c4737f6c6f5","ps_8d85f1e5-b34c-47d6-8612-695f51432eb2","ps_d47060ac-9b8c-4357-bcf7-dd0281d63fc8","ps_94193d33-bff9-4768-91de-b7e01c4b415e","ps_6c737f95-d6b3-4c0d-b6da-8473dabbca9d","ps_f71bb89c-2464-4222-8e80-024282e82ba8","ps_78398fd7-fedb-4e03-8369-1ad00ccb86e5","ps_2a8025c1-1101-4b66-ad76-34dce5223bb4","ps_b7fb5d1f-4bf2-454b-91c1-cdb1d4dfe5aa","ps_059d8be4-2999-4f55-9c1e-6a5b397e81d9","ps_8266f60f-5bc5-4449-9f39-1abf86656bef","ps_d10dc395-3b94-4235-9d90-e3465121ae8d"],"snippets":[{"id":"as_14351195174","text":"Too good platform thank you blinkit and thank you to the handling team to always provide us the necessities so easily at our place to blessed to have you serving in our town","truncated":false,"rating":5,"source":"appstore"},{"id":"as_14323403968","text":"Free Ambulance service by blinkit deserves a big round of applause, thank you blinkit for this service","truncated":false,"rating":5,"source":"appstore"}]},{"cluster_id":"cluster_20","theme_name":"OVERALL_POSITIVE_EXPERIENCE","theme_description":"Users are extremely satisfied with the app, praising its convenience, selection, and prices.","user_segment":"frequent grocery-only shopper","core_job":"find and purchase daily necessities","opportunity_title":"Improve Product Pricing Transparency","evidence_count":50,"prevalence_pct":4.24,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14346020134","as_14343312715","as_14332635935","as_14329735166","as_14325167120","ps_c903c1eb-3f94-42ca-a51e-da184ac0dcc3","ps_3fc00c75-30e3-4133-958c-08096b296af3","ps_6ef624a7-f85c-42c5-8c6d-a67c3a92b087","ps_5908a159-ce6a-4bcc-a1af-43fb022cb6f1","ps_b3064bb1-f910-424f-9eea-6a294191bc6e","ps_48d736a6-78d0-4f52-9f2e-0a397473c1db","ps_8f4993bc-1d43-4699-9130-498a71523cf9","ps_0b5289f7-d8eb-4652-b21d-4238b6359587","ps_ceb2c834-f189-4dbf-a991-165c0a431a12","ps_394e8a6d-2b77-4f0a-aee5-b00ac8e07928","ps_3324d240-a967-47e5-aa54-986aefed7413","ps_d28872af-9396-4c3e-ae78-a9e453f35393","ps_69e9d52d-1828-4bff-bb88-e32d5623732e","ps_1c3af9dc-6425-4272-b24f-422807bc21d7","ps_eee5c62a-ec59-4e47-bb2f-073f8d79dac5","ps_b50450b7-9e2f-4ecd-8341-c79df9c60237","ps_df154deb-29cc-4c06-b8ff-ef848620c84f","ps_441e207f-2aa8-4dc8-811d-59bed10b4065","ps_471ec6d0-1433-45aa-93f6-574fa7a1b816","ps_8fa00320-005a-4bd5-ad90-6b166b350b40","ps_ae4c7c27-4f5d-47e8-ae89-02efbeb12152","ps_22b35422-2ff1-442f-b1a5-78de287f019e","ps_ed706fea-aa32-4aae-aa23-eba3500c57d9","ps_0f50931a-5fb6-41cd-8a6f-ec6f9d9a654d","ps_57ceba46-0cb6-4e6e-bfb1-8f8a096697c1","ps_7e5dc387-0330-4bb1-af70-e3863cea234d","ps_0810067a-f978-46fe-a055-97fb180e28ae","ps_c6dfd3ea-1e6e-4bb4-8268-c5bf79049026","ps_dfef34e7-b2a2-47ad-9f62-1e8888211d7e","ps_1f236f82-7416-460f-b0db-bca20e6f01d6","ps_1b1bd546-45b0-45d0-bbb6-bf352b9cc662","ps_d3347a4b-8744-40d2-9ff7-759070c67666","ps_c52188af-060f-47d0-89b3-2165d7d18da2","ps_62f5dc1a-8cb4-4bce-8dfb-6648a6d5923e","ps_0e02b41d-a403-416d-b250-94f94e3589bb","ps_53af042a-0864-49f7-846a-650620f48d12","ps_2a296de5-fd0c-4870-b3cc-b45683c28270","ps_98746a17-1a5c-427b-98bc-b3b456aaf741","ps_1a9cb706-c12a-4200-8683-cd2c8658c83a","ps_d6389a6b-8bb6-4244-83f7-409be47c16f6","ps_5f056d0c-5be7-4990-84ba-174215e7464d","ps_39161a3f-ef34-4302-a279-a8d75d39896e","ps_42ec2a89-f2b6-4b5a-872d-fd83b3aadbcf","ps_6576c7c3-b16a-47cf-8dec-4614960b2f1b","ps_26c5c48d-53f1-448e-a407-5cd2e3697009"],"snippets":[{"id":"as_14346020134","text":"Very helpful app","truncated":false,"rating":5,"source":"appstore"},{"id":"as_14343312715","text":"Most convenient app for your daily necessities","truncated":false,"rating":5,"source":"appstore"}]},{"cluster_id":"cluster_19","theme_name":"Poor Quality Control","theme_description":"Customers are unhappy with the quality of products received, citing issues such as expired dates, damaged packaging, and incorrect items.","user_segment":"frequent grocery-only shopper concerned about quality and freshness","core_job":"receive fresh, high-quality groceries","opportunity_title":"Verify Product Quality Before Shipping","evidence_count":48,"prevalence_pct":4.07,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14346520163","as_14346373788","as_14345685513","as_14345102962","as_14336959716","as_14322848416","as_14322385950","as_14322014507","as_14317995149","as_14314979861","as_14314906915","as_14314596256","ps_0d5a83eb-f175-4c40-ae44-aa32d8218b1c","ps_88e0ca7c-363f-4ed8-b180-abc7b03df696","ps_ca43d131-36fe-468b-8211-2d8bfd7d7b63","ps_01338036-6fa0-43a4-8f81-e61cb69eb756","ps_75e02b6e-2b28-4f67-b7c3-e1fae506881a","ps_0f040891-a022-4f06-8ced-d7f28179af82","ps_5b9169ea-74d3-498c-b122-0164fc5679dd","ps_febb32f8-8b99-4b66-b9b9-7a05650ba3e0","ps_be7b9fa8-0127-4cd0-87ad-68b4b39dd207","ps_a0038019-f31e-4416-b5f4-f9e0a5c2f66d","ps_e783d3ce-17aa-4c5e-8b91-b367bfad6f91","ps_37cf91d6-a59a-40dc-9689-92ff42f6fc8d","ps_284fc00c-471c-4d92-9a7b-5849c15f4a86","ps_dc7e65cf-2e05-43cf-bd3f-a734225337a2","ps_8a0636df-2993-4362-b690-c83bcdcf0d9c","ps_d40ea3a2-a1f6-46db-bc85-10cb9d1c3d9c","ps_1005b976-3e54-49b3-9fa1-72d8702a2625","ps_e54adc83-c5c5-4e8e-80cd-c49041ada149","ps_7b603920-ee0b-4dae-a9f2-37cca41f3747","ps_561f154c-59c9-4525-a078-d670dd727fe5","ps_515d5349-09ba-49e0-92eb-04a3693eef2e","ps_5dd4602c-474c-4949-8ae5-366c4a10d93f","ps_dfd12228-dd90-452c-8b44-568dbd3fccd9","ps_0dc6d06a-28dd-4823-b71c-5f9d32e23122","ps_f450a80b-d451-4a3d-9fd7-7d6edb26b596","ps_2b3df9ab-0222-4c03-be81-87aff1674b10","ps_03af9982-cbf4-4dbe-8fb8-8e18b7963e76","ps_5ec3cbd6-f266-43cd-8cba-0afc832b195a","ps_5b7d0668-1c5f-4a83-a3f3-d9c2f04f51c0","ps_bd663a35-4609-43b5-9c1a-60a4720ee547","ps_7e248ccd-8049-4c40-8530-c1b86e3ea706","ps_f4d500d2-e5e3-4161-a769-cb1ae4257cef","ps_0c84533c-2bef-47dd-b847-20f1b59d920b","ps_760203dc-d29f-4aa0-8826-80611e62beb6","ps_7cc03c4c-3877-4d6c-b0ee-84e66d0c7df5","ps_b8416633-f363-4cb1-a427-dd3344e2335e"],"snippets":[{"id":"as_14336959716","text":"I’ve received Buffalo Milk package with scratched mfg and expired date on packet. After complaining regarding this they asked me for proper image with mfg and expired date for refund.  And they have rejected. \n\nSerious Concern.","truncated":false,"rating":1,"source":"appstore"},{"id":"as_14322385950","text":"I have ordered baking powered yesterday. They sent of a baki g powder which was expired. They made that box dirty with a paint kind of thing on the manufacturing and expiry date. I will soon switch to big basket . Not expected this kind of…","truncated":true,"rating":1,"source":"appstore"}]},{"cluster_id":"cluster_35","theme_name":"Poor Customer Service","theme_description":"Customers report difficulties with returns, refunds, and exchanges, as well as being misled by the company.","user_segment":"repeat buyer with high expectations for quality and service","core_job":"return or resolve a defective/damaged product","opportunity_title":"Improve Return/Refund Process","evidence_count":47,"prevalence_pct":3.98,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14350862728","as_14350301206","as_14348444222","as_14346494243","as_14343172100","as_14333832535","as_14333225357","as_14326860553","as_14322564839","as_14322067831","as_14321449711","as_14314160717","ps_75bdb0f8-1fb3-4f42-a102-9a03d3ec2ad6","ps_c58c03b0-655d-4658-9e33-c281de44a181","ps_e862d51a-fd80-43e0-8e84-85cab5b57c7f","ps_d3475de0-0ae4-45ec-b221-be3a2718760d","ps_bff522de-9f38-4826-a708-76bbc1516c84","ps_0c275b7a-68cc-437a-a440-b07502bcb9e2","ps_781fcdf7-64b0-45f7-8a96-820393f95c10","ps_f021ef6f-48f3-493f-9f76-b5f25a522d6d","ps_c07d308a-61ed-4e2e-a071-8659fee565dc","ps_5f0af330-36ac-4ee8-9ecd-e12bb4d8bdea","ps_9803557a-5954-4171-8936-e1b402032050","ps_2a796fb1-1f49-4d73-8941-96507898b2ff","ps_4a6e7a5d-8a73-4312-84cc-ddd0b04557e9","ps_a05462f2-c24c-4603-9cfc-66f6cd198c57","ps_7a6fca12-6c67-4fdb-80e9-eb7ef053beb3","ps_64bd4afd-b358-4258-9784-cf5f8a65dbaf","ps_ddc1c085-a5ae-4fcc-8701-bb6fdf4747e4","ps_de744e7d-cc5d-46d6-a3ba-ba0b1fa81026","ps_c4c4bbc0-989d-4bba-80fb-72971cb81ae9","ps_227c4524-5729-4724-852f-bde76d97a317","ps_136306c1-0ceb-4939-8565-5ba2d56512e5","ps_aebb6ce9-7e01-403a-af51-0393ae107f4e","ps_95133765-ff26-46f5-a3a7-f6368729980f","ps_2fff4244-f3b4-4469-9620-341d75103a34","ps_7e8017b1-ce81-4201-a6bf-d0b97c6b63fd","ps_2532981b-1eab-488e-9134-ce3e8fcfa9cf","ps_31aadb0a-4d3f-461d-a30d-116fd451ce4a","ps_9f053b50-2dbe-48cf-90ce-b7080fecfb93","ps_38689396-54f1-4f47-aa40-e84322edcc0d","ps_98051f6b-9795-4f7d-a32d-1dec1d739fa1","ps_54a55751-b585-40fb-a066-439fbc80a02d","ps_dd5a7795-1339-4ce8-b5c7-541c320dbff4","ps_d4f8ae23-067d-4e44-83c1-7319df58ce4a","ps_33f04659-be2b-450e-a161-e9b270b3ef02","ps_2ef9eebf-23b0-4769-bbb8-d89e4678d0d5"],"snippets":[{"id":"as_14350862728","text":"They never return a product, it has been a few times now","truncated":false,"rating":1,"source":"appstore"},{"id":"as_14350301206","text":"Light is Not working and the frame is damaged.","truncated":false,"rating":1,"source":"appstore"}]},{"cluster_id":"cluster_37","theme_name":"convenience and ease of use","theme_description":"Users praise the app for its convenience, ease of ordering, and fast delivery.","user_segment":"frequent grocery-only shopper, price-insensitive repeat buyer","core_job":"order groceries quickly and conveniently","opportunity_title":"Improve Last-Minute Shopping Experience","evidence_count":42,"prevalence_pct":3.56,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14346333930","as_14334308736","as_14330161126","ps_06ddae80-dda8-4be6-bb98-3f39b0f24d35","ps_b4fb5f2a-4760-4030-baa2-47dc7fbc7836","ps_ebb754de-3c4a-40e4-9dac-47131b9c8aae","ps_4eb24db8-1197-4b7f-acf9-e4fdce936230","ps_84c7764a-5a44-40e3-b273-251b977e33fe","ps_05754dcd-3a17-4434-8d4c-a542c24f9a73","ps_c305f514-2ad5-4969-9b1a-a8973474cbc9","ps_e3d0600b-535e-4d93-8f2b-a00ff00456f7","ps_f712acd5-7241-4783-8c4c-745bd649184f","ps_a5ffb918-bc2f-41f7-91da-76c47d247ec7","ps_88f5757c-bedf-4a9c-a2b9-50fd1be2cc88","ps_f55ed4c0-5f05-4c19-a693-6a1cc2539ffe","ps_4add16df-7cbb-4526-b733-f91f01cf7d2e","ps_e42f7dea-c6b8-47e3-baac-9f29cd406645","ps_dbf8d640-64f2-4d4d-83bc-52a516022720","ps_5ece4560-8893-44af-b6a2-ea1f504741bc","ps_a2ec8938-ece4-47db-b555-1c8706f72d0f","ps_a7f16d76-b89f-4a41-841e-1319afae10be","ps_27a5fb35-da43-4a7e-a946-9d5914f8bd3a","ps_d70e7e00-8821-432a-8199-e20124661d39","ps_6a758c56-5183-45aa-a092-a9eec63b4d48","ps_89f6a996-5519-4aea-904b-b0a27b0175f0","ps_cd427924-19e5-4510-a03f-fce6807338b3","ps_756e433a-32f7-436d-81c8-1ea726d68cff","ps_d33668f8-952a-48a7-b528-e295a92f77b6","ps_3dac8cc9-2dc5-4454-8e51-f8bd577ef86e","ps_69347312-a938-4eb8-8078-353aac5493b5","ps_f49cfd9b-6520-49fb-aa08-9168958db96f","ps_4fb1d5b8-ded6-4df7-9fe7-0c294243357d","ps_3eccccbd-50c3-45e8-8ffc-a4259993931e","ps_9d922e72-8823-47aa-9d79-2ad6db827f11","ps_51ddba27-0993-41e5-9fe9-b747311bfef9","ps_3bf57299-db76-4536-9dc1-a91634cc16b1","ps_5974db19-810d-4877-8a1d-b315e789dd0c","ps_d7ec6933-feb5-40b8-a005-b03582e7e5e9","ps_c4e50643-f7f8-4b10-bf57-848597d27d28","ps_8d06bbe6-9463-4942-8c8e-6349b4b8c11f","ps_44cbcd80-4c28-45d9-9539-1e828c4ce1cd","ps_6ecc27d0-48ff-4e6b-bfd2-787821644614"],"snippets":[{"id":"as_14346333930","text":"Good app for last minute shopping","truncated":false,"rating":5,"source":"appstore"},{"id":"ps_ebb754de-3c4a-40e4-9dac-47131b9c8aae","text":"wonderful app... eassy way to bought a grocery or household items.. thank you 😀A big thank you blinkit..it is very nice service for me.. I ordered any item anytime 😀😀this app is very convenient for me ❤️","truncated":false,"rating":5,"source":"playstore"}]},{"cluster_id":"cluster_34","theme_name":"Fast and Reliable Delivery","theme_description":"Users praise the app for its fast delivery times, with most orders arriving at their doorstep within minutes.","user_segment":"frequent user, prioritizing speed and convenience","core_job":"get required items delivered quickly and conveniently","opportunity_title":"Improve Real-Time Delivery Tracking","evidence_count":41,"prevalence_pct":3.47,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14326094581","as_14324816322","ps_e4fd4409-4b77-4c69-99aa-a937a5ffab18","ps_f6d578c2-409e-4e39-8a03-32a1ccd91475","ps_24885db9-1d78-444c-9f42-55a262d9bfb4","ps_d5347de2-1532-4110-aac7-293fea2b18dd","ps_b804e68b-7ebd-4626-ae1b-4f8a2b178228","ps_da8c098d-670a-4897-ba06-a5b8dda32386","ps_3bb21cf8-ea64-40ac-90e3-2c538b966720","ps_0dc12cb4-8db8-42ed-9d88-38a3f33de829","ps_c6f9cbbe-b24c-43f9-92a9-abc04f21df6f","ps_80db8539-b865-421d-a464-7a4595c2ecf2","ps_35a7af1a-f711-4935-b231-550e9d5379b3","ps_536c2343-fb15-4592-a770-6c064689e9e4","ps_95ca5a7a-9b20-4d74-8062-cb1a62338002","ps_ed4395aa-fc39-4dc1-8e02-f5e60dd13c1c","ps_1a1ae255-6aad-42bf-a623-5575e5a899da","ps_a9920a12-33e1-4a4b-bf11-0af5bb7c0d4f","ps_7f299767-9008-4772-a734-d040ae21a3dd","ps_fb744d8a-8146-4651-8956-d10b503c63d4","ps_7e17ac4d-40ba-43dc-961b-dfea5d7c5d32","ps_685c0626-3e46-4556-ab4e-add58b377e32","ps_7acd3182-c284-409b-82f7-4ef68e50e93b","ps_80bc9a33-520f-49ab-8984-30b9a070efc2","ps_7498ec4a-663d-405c-b9af-b61c3ec3c9d9","ps_2d635405-3276-4fb8-80bb-0afc5f11fd50","ps_53fb5054-1090-43bb-a3c3-4b4a445f8640","ps_4d08c65a-f04c-4eac-9638-731c82b96251","ps_c9cbf638-b4f9-417d-a346-fba53b1148e5","ps_6f54c8c5-c8bf-482f-a362-3cce98a96223","ps_fa3ed2eb-0f54-4dbf-b190-f51d140cfbd2","ps_85169fc7-f212-4599-90f6-c49dd66f972a","ps_15998e11-71c4-4985-9765-632c22057a68","ps_bf563685-152f-40bf-911c-a5079e6624fe","ps_336e20a2-135f-4e32-b8de-62802eda9ae2","ps_5de0fa11-ad50-4b1f-8724-108fc1ca7c96","ps_446ff642-df9f-41f3-8352-b55ee1a41ebb","ps_6fca37b7-c430-4f07-a4e8-7e8d6e5ed674","ps_e0ff7ee2-8e95-4d7e-b423-e1cdaa7af3b5","ps_b53f05ac-7364-4819-bf06-ee9dfc5aebe2","ps_69bb74d8-4665-4439-9a2a-233a274cc89b"],"snippets":[{"id":"as_14326094581","text":"The delivery is faster then other shopping apps and handling is good the best thing is this delivery comes at the door step because of this I rated this app 5 star","truncated":false,"rating":5,"source":"appstore"},{"id":"ps_f6d578c2-409e-4e39-8a03-32a1ccd91475","text":"very dependable, and prompt. Always happy to order from Bl8nkit, over other similar apps. keep it up guys!😊","truncated":false,"rating":5,"source":"playstore"}]},{"cluster_id":"cluster_12","theme_name":"laggy performance on iPhone","theme_description":"Users experience significant lag issues while browsing the app on iPhone 15 Plus.","user_segment":"frequent grocery-only shopper","core_job":"acquire essential items for daily life","opportunity_title":"Optimize iPhone Performance for Seamless Browsing","evidence_count":30,"prevalence_pct":2.54,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14349323517","as_14337143397","as_14336764927","as_14318189415","ps_a75bfd8f-4000-4662-ae0d-266f47b5a826","ps_9e5a3b8b-30dc-4ed9-9d26-72ba9739a1bc","ps_a79ad27e-c5ba-485a-89f2-c41ab8373d6b","ps_0deb577b-3c5a-420f-9718-72affda33556","ps_1604ebd2-89b7-4483-9504-517a4a0612f8","ps_f5012cec-9895-46cf-8044-18431b4f1a22","ps_d472aa80-0f92-4c2c-b9b0-4874268cb7d1","ps_3a8c494c-10f9-4158-a2e5-0ba9f72fb689","ps_b35c6bc2-9880-4867-af33-1edfef0ddd8a","ps_e5180cd8-32f3-422e-a546-c790d5962612","ps_d13239ae-075e-4231-be50-b9bb4fe51388","ps_dce1b556-4494-41d8-950f-532a1f15b614","ps_91cc2fa0-9f12-4820-827f-f4272835f096","ps_13d22023-5104-4350-96b5-433aa93d307b","ps_9e892717-2ab4-4d6c-bc04-6ac119376e90","ps_5dd4b433-5715-4e98-b69f-d4035bd618f7","ps_43c3a908-40c0-4fd0-9368-89be9d41e66b","ps_5814bb18-a876-4cf9-8cc9-20a3cc7c429d","ps_bca345d1-3285-4f45-ba43-9d811a8c710d","ps_5a33f3ea-c662-4d6e-948a-e8309c0fdd42","ps_324de587-1683-49b2-b60f-92c5b692f917","ps_73bf4451-30f1-4759-b02c-5207dfd1a5fe","ps_4bf3ad81-3303-48a0-9501-261155a773d7","ps_0ca6a4fd-144e-404c-856e-6e45b282e3b9","ps_dcc9871d-814a-4528-b0bd-306f10e831d1","ps_944a8d99-49fb-4c9b-be69-9786c756b0ab"],"snippets":[{"id":"as_14349323517","text":"App is great for quick delivery, but major lag issues on iPhone 15 Plus.\n\nWhen I go inside Blinkit > Category > Sub-category > Product page, the FPS drops hugely and scrolling becomes very laggy. Response time is also very high while openin…","truncated":true,"rating":2,"source":"appstore"},{"id":"as_14337143397","text":"Blinkit has completely changed the way I shop for groceries and daily essentials. The delivery speed is genuinely mind-blowing,I don't know how they do it! The app is super user-friendly, making it easy to browse and find exactly what I wan…","truncated":true,"rating":5,"source":"appstore"}]},{"cluster_id":"cluster_44","theme_name":"Fast and reliable delivery","theme_description":"Customers praise the speed and efficiency of the delivery service.","user_segment":"frequent grocery shopper seeking convenience","core_job":"receive fresh products quickly","opportunity_title":"Improve Delivery Tracking and Communication","evidence_count":28,"prevalence_pct":2.37,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14350584072","as_14335023102","as_14324273601","as_14318193100","ps_d3bd728b-89c1-44cc-b45b-2edec2c82e6e","ps_86f7d6ca-303c-44e0-b0e7-3783520b2140","ps_aa094d65-fa56-4600-b961-50f0de43d743","ps_677e2bc9-8a42-4703-a910-053adecec256","ps_26422a64-d69a-42cd-87c3-d10ee81be0b1","ps_960b27c4-a2ed-479b-9e93-ec64d8555aae","ps_5804d0fa-0fae-4a9c-aa88-77d1b26b4cab","ps_a999566d-15c8-44dc-a662-da299e488d26","ps_f4ee60b0-f4bd-4282-9195-90646737f0bd","ps_a2d31ce0-3528-4367-970e-036ae643fc26","ps_92a091d5-4859-48d4-8fe1-6f22af0cb91f","ps_4e8ecb82-fa97-432b-9495-9f3b81cd94ea","ps_9fbae3dd-6823-4e70-ac0a-63e5d06df27e","ps_561fbc6d-5f0a-44d1-a871-0eae4f1c0d3f","ps_9ef725e9-ad7b-4dd2-aa89-8ab1683eb067","ps_9e221c0b-0b0a-41c1-aa1c-a7e4c4c6044d","ps_62999a14-76b0-497c-a7b7-06143a02a003","ps_6c68648d-4fd4-44bd-a855-0a38ad780b94","ps_0612e3a8-1faf-422b-92eb-853536b85bba","ps_b4da47ed-d829-4bc8-a7ba-c61f55c802c6","ps_6f918cda-200a-4738-8f81-c43b35f8780a","ps_3b0cfebd-8088-419e-8ee3-e0d592da131e","ps_005931b6-dc0f-406f-a97f-57df07bcacb8","ps_5a312d1e-ca0a-4820-a956-16a427f957f9"],"snippets":[{"id":"as_14350584072","text":"Very good and fast delivery","truncated":false,"rating":5,"source":"appstore"},{"id":"ps_d3bd728b-89c1-44cc-b45b-2edec2c82e6e","text":"It was a quick delivery. Thanks to Mr. Rohit☺️","truncated":false,"rating":4,"source":"playstore"}]},{"cluster_id":"cluster_41","theme_name":"Inaccurate or excessively long delivery times","theme_description":"Users are frustrated with the discrepancy between estimated and actual delivery times, often resulting in lengthy delays.","user_segment":"price-sensitive repeat buyer","core_job":"get product delivered within a reasonable timeframe","opportunity_title":"Improve Estimated Delivery Time Accuracy","evidence_count":28,"prevalence_pct":2.37,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14345107431","as_14335551833","as_14332141172","as_14329779073","as_14323536488","ps_8ef535f5-bd30-430b-a4cb-3157ea01871e","ps_6e70ed11-dbfb-467d-b860-d04854467696","ps_7cfe97f2-9e06-46bd-860d-8ab515edcaaf","ps_5ed1d401-3a6f-4ae9-9c1f-e6d2675f0187","ps_00b942fb-9c66-4359-9b63-b177589ea495","ps_d1049117-9d07-4e8d-b2bf-0e11ca6ea273","ps_4c9ca8ef-9751-48eb-af4d-8eb17b8653ba","ps_3e859ff7-e4fd-4ff9-a828-3c7da388facd","ps_86ca308a-a309-4784-b044-e446a59d06ee","ps_3ff0269d-4f64-4e39-a8ac-edda71492a7c","ps_5631b85d-9e3a-4f6f-811c-0e7cecd86b34","ps_8e2d98bc-4ec3-4eda-99b9-c7360b64ab49","ps_2daac325-f31e-4dde-8203-aafcc0c1291e","ps_78d90253-be6a-401e-bd68-89ccfdf84101","ps_dca6f2c3-e36b-41c5-b021-5cdeb7445aec","ps_003fa925-8402-496a-b6bb-26841ee52242","ps_cf9cb405-46e3-4386-b2e0-c49728ca0eab","ps_71cfd713-f8c7-4165-b868-4328f82b776c","ps_06ebf5d7-27cc-44fd-9d31-37f6f8c5c6dc","ps_8d0c4910-fd07-48cb-a3db-0b8f84726fc3","ps_49f77d3d-7014-4f7b-a44f-492cac1549ec","ps_f36b4a79-7043-4965-b256-af4b4c6ba9cb","ps_dffd3aae-0a11-4818-8f48-a7696b270e16"],"snippets":[{"id":"as_14335551833","text":"Always late and terrible delivery service.","truncated":false,"rating":5,"source":"appstore"},{"id":"ps_8ef535f5-bd30-430b-a4cb-3157ea01871e","text":"orders always take more than 35 mins","truncated":false,"rating":1,"source":"playstore"}]},{"cluster_id":"cluster_29","theme_name":"EXCELLENT_SERVICE","theme_description":"Customers praise the service as perfect, good, or best.","user_segment":"repeat customer seeking convenience and reliability","core_job":"get perfect or satisfactory service","opportunity_title":"Improve Service Communication","evidence_count":27,"prevalence_pct":2.29,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14343395408","as_14333772263","as_14321136067","ps_cf504164-0c20-45f5-b62d-1b7f5ccf293e","ps_01645de5-cb70-469f-8e21-fda969543ac0","ps_75d845c8-7933-43ed-92e2-edd90ce3b505","ps_b9869778-73ce-499e-870e-f95514e7c206","ps_102bd0b5-b1d6-4783-b9d5-b013d8f81ea7","ps_fcb1feb2-cbfd-47c9-a5ce-f85193620cd6","ps_cbdf9cd9-d619-4ec2-97d5-f2821579a637","ps_1ecb7266-664c-4fc7-8bd5-445937492818","ps_b0a0b716-16f1-4e9c-9932-f02d512123bc","ps_39611854-4fee-4fe9-b957-e76aeda180f1","ps_b3af26ff-83df-4197-bab1-a08bb301ed71","ps_f4edce17-3258-4c91-86da-bd940b2f430d","ps_1dd4f0a9-75e9-47aa-a01f-e30a4a15003d","ps_687a2156-6c67-49f7-b580-db92c69b1bcc","ps_12e4e1c3-f453-448f-90e6-9e73621a4ff7","ps_8f4d7f37-28af-4b59-aeba-781f1d8f2481","ps_6f6a1ee9-86fd-4bef-b521-c692f3c9c221","ps_fe991c8e-569a-4f6a-a304-4fab35bbfad7","ps_322bcf20-cd63-4361-9122-adddd526f158","ps_21ed50e5-5c2b-4479-be90-cb766f8a8654","ps_5e099657-7782-4a93-adf1-3028f36acb21","ps_5099ed65-7efc-4e41-ad7e-3a326a9e253b","ps_f715b380-49ca-4067-947b-c9d018e1e8da","ps_9463c25f-b478-4d75-a5b0-ccc7d951b84f"],"snippets":[{"id":"as_14343395408","text":"Perfect service that consumer wants","truncated":false,"rating":4,"source":"appstore"},{"id":"ps_cf504164-0c20-45f5-b62d-1b7f5ccf293e","text":"best service ever","truncated":false,"rating":5,"source":"playstore"}]},{"cluster_id":"cluster_39","theme_name":"Poor Customer Service","theme_description":"Users are experiencing unhelpful and frustrating interactions with customer service, including automated AI agents and unresponsive employees.","user_segment":"price-sensitive repeat buyer who has had multiple negative experiences","core_job":"order and receive a product without issues","opportunity_title":"Improve Order Cancellation and Return/Replacement Process","evidence_count":22,"prevalence_pct":1.86,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14351306146","as_14350966279","as_14349079298","as_14341333418","as_14321422501","ps_149fe7c0-46c8-4a6b-bd01-984869ea6fd9","ps_b273c3ef-1928-42b5-bd09-e85b87126ebb","ps_ea393d44-d9c1-4be3-aadd-05c28fb9298c","ps_5c17bbdb-c932-4e94-b429-16f41b321f78","ps_8cffd1dd-cda9-46d8-8061-65b1f4bffcbb","ps_116d2076-f3a7-49c7-9ea6-4b7cd0460ceb","ps_6108702c-4b3b-41fe-aac4-5e3f97393f1f","ps_0772d939-2469-4e12-9b29-9682a509c847","ps_d9edff94-0c14-43a1-9928-f49b05e6c37b","ps_650e3782-ff1b-4ff3-9238-f8732764aa76","ps_3cb06069-0bfe-4644-bcc6-7f2a2a728029","ps_db9e3f1a-1a78-4627-b455-e0d2a5d32c49","ps_b0be9709-db02-479c-a694-c6e03ef76cb0","ps_c5653188-cd99-4fd1-a1f4-555c6b7534ca","ps_d2d7d8d1-8aec-4ccd-b7d0-d7793676edc1","ps_0d0b5523-a171-4a3c-94b6-34fb9f45f933","ps_e030c217-426f-4499-8a3e-9ff5c1a7626c"],"snippets":[{"id":"as_14351306146","text":"In store employees are cancelling hotwheels orders which are rare \nIt says cancelled due to technical issues - some sheet \nReputed and premium app but fraud employees","truncated":false,"rating":1,"source":"appstore"},{"id":"as_14350966279","text":"This app scammed me .i order 10 items and they gave me 9 and now after tell them thay are not even accepting it that they gave me less item. I got scammed","truncated":false,"rating":1,"source":"appstore"}]},{"cluster_id":"cluster_0","theme_name":"Poor Customer Support","theme_description":"Users are unhappy with the lack of effective customer support, including issues with returns and cancellations.","user_segment":"price-sensitive repeat buyer","core_job":"get products delivered at a good price","opportunity_title":"Implement Cancellation and Refund Options","evidence_count":22,"prevalence_pct":1.86,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14314632466","ps_0866be12-d4d1-4f05-984f-eb24125db3e2","ps_3f8d178c-bf3c-4c0c-9d18-8dab051529f0","ps_1135298a-341b-42ae-982f-43be00cb24ff","ps_c0ec64bd-a54f-4e3f-ac29-247554d905e6","ps_a5a7c5af-0e7e-4d43-a647-eee89b164b70","ps_6637a5fd-889f-4ab9-a8bd-9a3e25da2833","ps_2e434d45-1c26-4259-8282-93eb4cb37a74","ps_119453dd-a472-4a7d-b176-55afd6135a09","ps_42ac6998-6e78-4ac5-b4ae-39d85bfdc128","ps_5bba8275-77ed-46f8-9994-43bedef81fc3","ps_09e5954d-8e80-477f-b8f2-527add975ac2","ps_a23bda9a-ee79-4a5b-ba48-33320064000d","ps_1dfd2fb1-58de-4c7d-9953-c08111dab864","ps_5870080d-451f-48a9-b400-92d4ee0b893f","ps_75f212bd-e75e-41a3-aae9-db704d931f79","ps_adb5cf76-9a9a-4d33-8820-55adb0f431b0","ps_7eda1a51-1280-4f56-b3f1-db2660e13bd9","ps_5159ef1d-8dd4-4b45-9bf2-4d2258138d8a","ps_34bd1641-381d-49f8-9ca6-b91b94be0525","ps_1bceaaa8-ecda-4a9a-a36c-04266192f655","ps_df034df9-64b6-40e3-b26c-0b8bd0dabac6"],"snippets":[{"id":"ps_0866be12-d4d1-4f05-984f-eb24125db3e2","text":"bakwas app hai, cancel order button nahi hai, or delevery boy ne 75 rupees scam kar liye mujhe se","truncated":false,"rating":1,"source":"playstore"},{"id":"as_14314632466","text":"Bhai Bhadiya hai Blinkit sab use karo mast time se chiz mil jati hai bas discount dediya karo Mhuje plzzz jada sa 😭🙏🏻💓 Baki sab bhaiya hai secure ata hai sab or achi quality m ata hai mast hai bro I used that recent 1 month I fell good…","truncated":true,"rating":5,"source":"appstore"}]},{"cluster_id":"cluster_32","theme_name":"fast service","theme_description":"Customers praise the speed of delivery and helpful representatives.","user_segment":"frequent online shopper seeking convenience","core_job":"receive fast delivery of ordered items","opportunity_title":"Improve Service Speed Consistency","evidence_count":21,"prevalence_pct":1.78,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14349396427","ps_6e9baccd-8ec2-4458-ae9d-f29068208846","ps_6df5623c-6af7-44ee-b19d-8added18835e","ps_340afe78-0fa4-4127-98c2-01ac0d5e239e","ps_b83230ce-6357-430b-9df6-e15992002fdb","ps_4260885b-4d52-415e-a2f2-a68213ec2537","ps_b3fb7f54-a71c-4b75-b908-e868013ab959","ps_9c3980ef-5ae7-4d54-a850-43d1acfa2241","ps_a4db380e-2d1b-4f55-9598-82d65c893b9a","ps_d125039d-ed68-4414-9828-5ec75f3391b4","ps_fc53af14-b157-4a2a-be71-3442012d24d8","ps_2144e999-8c19-4212-8df9-d9ce864d5e66","ps_505449d8-4c6d-43db-bf01-b98b6c58ddee","ps_ba1291a3-81a0-4c23-879a-2e246dfe2540","ps_7c731b1d-1972-4e17-8567-e0246dc46418","ps_8b38eebb-8c1b-4209-b3de-3985fa499440","ps_11dbd475-6d6c-4dbf-9481-b35008eac8fb","ps_75a4a546-0456-4a0c-8962-25c55d83fdf3","ps_5ade36e9-6481-40e0-8cae-276e13838899","ps_9b2482a2-c28d-4aaf-97f0-e914ce15670f","ps_ac37a94c-0e68-48c1-aded-d1d3eefca0cd"],"snippets":[{"id":"as_14349396427","text":"Service is faster than click","truncated":false,"rating":5,"source":"appstore"},{"id":"ps_b3fb7f54-a71c-4b75-b908-e868013ab959","text":"fastest service","truncated":false,"rating":5,"source":"playstore"}]},{"cluster_id":"cluster_11","theme_name":"Incorrect or missing address information","theme_description":"Customers are experiencing issues with delivery personnel using incorrect addresses or not verifying the correct location before delivering orders.","user_segment":"frequent online shopper experiencing delivery issues","core_job":"get correct order delivered to my address","opportunity_title":"Improve Address Verification and Delivery Partner Navigation","evidence_count":20,"prevalence_pct":1.69,"prevalence_basis":"embedded_reviews_analyzed","validation_passed":true,"hallucinated_ids":[],"evidence_ids":["as_14353184526","as_14345626197","as_14345498078","as_14340157518","as_14325435700","as_14314299309","ps_a24d9dcc-8ba9-490b-8703-832efed56e44","ps_628df959-8638-4d48-b192-e14731a0dc65","ps_652a64e4-a6cd-48fb-8417-90d779b55811","ps_509e0915-c17c-4859-b0f8-7abd41d645f5","ps_b8a8ccc6-493a-4d6e-8065-6f9324735df9","ps_ec764e19-b717-4aee-824f-38e496758a37","ps_21618b78-1fab-4ec1-ac98-a48681fd005a","ps_f475657a-29d5-43e3-8756-cbeb2dcf19bc","ps_805de014-b933-4111-a839-918e2daac9ff","ps_ced6dd13-1931-4f97-9923-a648465bc15d","ps_fb22dacc-23be-4083-9d2d-f771f9f7e389","ps_28346998-23e3-4561-b2b0-c8f9767234f8","ps_84deda85-80ff-4097-a58d-0749a7dfb27b","ps_ea660379-0fc9-42e6-8da9-343ee27194e4"],"snippets":[{"id":"as_14353184526","text":"The delivery person always calls from 1-2kms away where as I see that I have put correct address in app. And this wasn’t once but all 3-4 times when I tried.","truncated":false,"rating":1,"source":"appstore"},{"id":"ps_a24d9dcc-8ba9-490b-8703-832efed56e44","text":"Very pathetic application and delivery service. The delivery guy falsely claimed that I had entered the wrong address, even though my address was completely correct. I even showed him the correct address in person, but instead of accepting…","truncated":true,"rating":1,"source":"playstore"}]}]}
+/* DATA:END */</script>
+
+<script>
+(function () {
+  'use strict';
+
+  // Lucide line icons, inlined. No CDN: the page has to render identically
+  // off disk, inside an n8n iframe, and behind a strict CSP.
+  var ICONS = {
+    check:   ['M20 6 9 17l-5-5'],
+    chevron: ['m6 9 6 6 6-6'],
+    shield:  ['M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z', 'm9 12 2 2 4-4'],
+    alert:   ['m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3', 'M12 9v4', 'M12 17h.01'],
+    tag:     ['M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z', 'M7 7h.01'],
+    users:   ['M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2', 'M22 21v-2a4 4 0 0 0-3-3.87', 'M16 3.13a4 4 0 0 1 0 7.75'],
+    bulb:    ['M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5a6 6 0 0 0-12 0c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5', 'M9 18h6', 'M10 22h4']
+  };
+  var CIRCLES = { users: [{ cx: 9, cy: 7, r: 4 }] };
+
+  function icon(name, size, cls) {
+    var NS = 'http://www.w3.org/2000/svg';
+    var svg = document.createElementNS(NS, 'svg');
+    svg.setAttribute('width', size);
+    svg.setAttribute('height', size);
+    svg.setAttribute('viewBox', '0 0 24 24');
+    svg.setAttribute('fill', 'none');
+    svg.setAttribute('stroke', 'currentColor');
+    svg.setAttribute('stroke-width', '2');
+    svg.setAttribute('stroke-linecap', 'round');
+    svg.setAttribute('stroke-linejoin', 'round');
+    svg.setAttribute('aria-hidden', 'true');
+    if (cls) svg.setAttribute('class', cls);
+    (ICONS[name] || []).forEach(function (d) {
+      var p = document.createElementNS(NS, 'path');
+      p.setAttribute('d', d);
+      svg.appendChild(p);
+    });
+    (CIRCLES[name] || []).forEach(function (c) {
+      var el = document.createElementNS(NS, 'circle');
+      el.setAttribute('cx', c.cx); el.setAttribute('cy', c.cy); el.setAttribute('r', c.r);
+      svg.appendChild(el);
+    });
+    return svg;
+  }
+
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text != null) n.textContent = text; // textContent, never innerHTML — review text is untrusted
+    return n;
+  }
+
+  var AGENTS = [
+    { name: 'Theme Agent', icon: 'tag',   job: 'Names the recurring pattern inside each review cluster.' },
+    { name: 'JTBD & Segment Agent', icon: 'users', job: 'Infers who the user is and the job they are trying to get done.' },
+    { name: 'Opportunity Agent', icon: 'bulb',  job: 'Turns the theme into a scored product opportunity.' }
+  ];
+
+  function readPayload() {
+    var node = document.getElementById('extraction-data');
+    var raw = (node && node.textContent || '')
+      .replace('/* DATA:START */', '')
+      .replace('/* DATA:END */', '')
+      .trim();
+    if (raw && raw !== 'null') {
+      try { return Promise.resolve(JSON.parse(raw)); } catch (e) { /* fall through to fetch */ }
+    }
+    // Not inlined (or malformed) — try the sibling file. Works when served
+    // over http; on file:// this rejects and we show the empty state.
+    return fetch('./data.json').then(function (r) {
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return r.json();
+    });
+  }
+
+  function fmtTimestamp(iso) {
+    if (!iso) return 'Run timestamp unavailable';
+    var d = new Date(iso);
+    if (isNaN(d.getTime())) return String(iso);
+    return d.toLocaleString(undefined, {
+      day: 'numeric', month: 'long', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  function renderAgents() {
+    var host = document.getElementById('agents');
+    AGENTS.forEach(function (a) {
+      var card = el('div', 'agent-card');
+      var top = el('div', 'agent-top');
+
+      var left = el('div');
+      var nameRow = el('div', 'agent-name');
+      nameRow.appendChild(icon(a.icon, 17));
+      nameRow.appendChild(document.createTextNode(' ' + a.name));
+      left.appendChild(nameRow);
+
+      var status = el('span', 'agent-status');
+      status.appendChild(icon('check', 16));
+      status.appendChild(document.createTextNode('Complete'));
+
+      top.appendChild(left);
+      top.appendChild(status);
+      card.appendChild(top);
+      card.appendChild(el('p', 'agent-job', a.job));
+      host.appendChild(card);
+    });
+  }
+
+  function renderThemes(themes) {
+    var host = document.getElementById('themes');
+    if (!themes || !themes.length) {
+      var e = el('div', 'empty', 'No themes in this run.');
+      host.appendChild(e);
+      return;
+    }
+
+    themes.forEach(function (t) {
+      var card = el('div', 'theme-card');
+      card.appendChild(el('h3', 'theme-name', t.theme_name));
+      if (t.theme_description) card.appendChild(el('p', 'theme-desc', t.theme_description));
+
+      var badges = el('div', 'badges');
+      var count = el('span', 'badge');
+      count.textContent = t.evidence_count + (t.evidence_count === 1 ? ' review' : ' reviews');
+      badges.appendChild(count);
+
+      if (typeof t.prevalence_pct === 'number') {
+        badges.appendChild(el('span', 'badge badge-quiet', t.prevalence_pct + '% prevalence'));
+      }
+      if (t.hallucinated_ids && t.hallucinated_ids.length) {
+        var f = el('span', 'badge badge-quiet');
+        f.style.color = 'var(--risk)';
+        f.style.borderColor = 'var(--risk)';
+        f.textContent = t.hallucinated_ids.length + ' flagged ID' + (t.hallucinated_ids.length === 1 ? '' : 's');
+        badges.appendChild(f);
+      }
+      card.appendChild(badges);
+
+      (t.snippets || []).forEach(function (s) {
+        var q = el('blockquote', 'snippet');
+        q.appendChild(document.createTextNode('“' + s.text + '”'));
+        var meta = el('span', 'snippet-meta');
+        var bits = [];
+        if (s.source) bits.push(s.source);
+        if (s.rating != null) bits.push(s.rating + '★');
+        bits.push(s.id);
+        meta.textContent = bits.join(' · ');
+        q.appendChild(meta);
+        card.appendChild(q);
+      });
+
+      var ids = t.evidence_ids || [];
+      var det = el('details', 'evidence');
+      var sum = el('summary');
+      sum.appendChild(icon('chevron', 15, 'chev'));
+      sum.appendChild(document.createTextNode('Evidence IDs (' + ids.length + ')'));
+      det.appendChild(sum);
+      var ul = el('ul', 'id-list');
+      ids.forEach(function (id) { ul.appendChild(el('li', null, id)); });
+      det.appendChild(ul);
+      card.appendChild(det);
+
+      host.appendChild(card);
+    });
+  }
+
+  function renderValidator(v, payload) {
+    var host = document.getElementById('validator');
+    if (!v) return;
+
+    var clean = v.hallucinated_ids_total === 0;
+    host.appendChild(icon(clean ? 'shield' : 'alert', 22, clean ? 'ok' : 'flag'));
+
+    var body = el('div', 'validator-body');
+    var line = el('p', 'validator-line');
+    line.appendChild(document.createTextNode('Evidence Validator: '));
+
+    var passSpan = el('span', v.themes_passed === v.themes_total ? 'ok' : 'flag');
+    passSpan.textContent = v.themes_passed + ' of ' + v.themes_total + ' themes passed';
+    line.appendChild(passSpan);
+    line.appendChild(document.createTextNode(', '));
+
+    var rate = v.hallucination_rate_pct;
+    var rateSpan = el('span', clean ? 'ok' : 'flag');
+    rateSpan.textContent = (rate == null ? '—' : rate + '%') + ' hallucination';
+    line.appendChild(rateSpan);
+    body.appendChild(line);
+
+    var note = el('p', 'validator-note');
+    var parts = ['Deterministic check — every cited ID is matched against real cluster membership, not graded by a model.'];
+    if (payload.corpus_total != null) {
+      parts.push('Prevalence is a share of ' + payload.corpus_total.toLocaleString() +
+        ' reviews (' + (payload.prevalence_basis || 'basis unlabelled') + ').');
+    }
+    note.textContent = parts.join(' ');
+    body.appendChild(note);
+    host.appendChild(body);
+  }
+
+  function renderError(msg) {
+    document.getElementById('timestamp').textContent = 'Could not load run data';
+    var host = document.getElementById('themes');
+    host.appendChild(el('div', 'empty',
+      'No extraction data available. Run "node results-page/build.mjs", or serve this page alongside data.json. (' + msg + ')'));
+  }
+
+  renderAgents();
+
+  readPayload().then(function (payload) {
+    document.getElementById('timestamp').textContent = fmtTimestamp(payload.generated_at);
+
+    var meta = [];
+    if (payload.total_clusters_processed != null) meta.push(payload.total_clusters_processed + ' clusters processed');
+    if (payload.corpus_total != null) meta.push(payload.corpus_total.toLocaleString() + ' reviews analyzed');
+    document.getElementById('run-meta').textContent = meta.join(' · ');
+
+    renderThemes(payload.themes);
+    renderValidator(payload.validator, payload);
+  }).catch(function (err) {
+    renderError(err && err.message ? err.message : String(err));
+  });
+})();
+</script>
+</body>
+</html>
