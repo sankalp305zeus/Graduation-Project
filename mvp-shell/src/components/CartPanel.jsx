@@ -8,8 +8,10 @@ export default function CartPanel({ cartItems, subtotal, threshold }) {
       {cartItems.length === 0 ? (
         <div className="cart-empty">Nothing added yet — tap "Add" on an item above.</div>
       ) : (
-        cartItems.map((item) => (
-          <div className="cart-item-row" key={item.id}>
+        // Keyed by index too: the same product can legitimately be added
+        // twice, and item.id alone made React warn about duplicate keys.
+        cartItems.map((item, i) => (
+          <div className="cart-item-row" key={`${item.id}-${i}`}>
             <span>{item.image_emoji} {item.name}</span>
             <span>₹{item.price}</span>
           </div>
