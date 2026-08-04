@@ -1,0 +1,19 @@
+{
+  "clusters": [
+    {
+      "cluster_id": "test-1",
+      "reviews": [
+        {"id": "r1", "text": "I never buy electronics here, too scared about returns if something breaks", "rating": 3},
+        {"id": "r2", "text": "Wish there was an easy way to return a broken phone charger", "rating": 2},
+        {"id": "r3", "text": "Great app but I only trust it for groceries, not gadgets", "rating": 4}
+      ]
+    },
+    {
+      "cluster_id": "test-2",
+      "reviews": [
+        {"id": "r4", "text": "Didn't know Blinkit sold baby products until my friend told me", "rating": 5},
+        {"id": "r5", "text": "More people should know about the baby care section, it's hidden", "rating": 4}
+      ]
+    }
+  ]
+}
