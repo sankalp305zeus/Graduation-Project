@@ -84,6 +84,19 @@ export default function DiscoveryCard({ product, persona, deficit, onAccept, onD
               here has to make the bill feel smaller, never larger.
             </p>
           </div>
+
+          {/* Third and last block: how the product itself was chosen. Kept
+              separate from both evidence blocks above, because neither of
+              them justifies the pick — without this line a reader can
+              reasonably infer a model made the choice. It did not. */}
+          <div className="why-caveat">
+            <strong>How this pick was made:</strong> deterministic matching on{' '}
+            {persona.name}'s never-tried categories against the ₹{deficit}{' '}
+            checkout gap — prototype logic, not a model call. The{' '}
+            {CORPUS.themes_extracted} themes extracted from real reviews cover
+            delivery, pricing and service quality; none evidence per-category
+            discovery, which is why the theme above is a placeholder.
+          </div>
         </div>
       )}
 
