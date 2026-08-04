@@ -9,12 +9,17 @@ export default function CategoryGrid({ products, persona, onAdd }) {
     <>
       <div className="section-label">{persona.name}'s usual picks</div>
       <div className="category-grid">
-        {visible.map((p) => {
+        {visible.map((p, i) => {
           const { Icon, fg, bg } = getCategoryIcon(p.category)
           return (
-            <div className="product-card" key={p.id}>
-              <div className="icon-tile" style={{ background: bg, color: fg }} aria-hidden="true">
-                <Icon size={20} strokeWidth={2} />
+            <div
+              className="product-card"
+              key={p.id}
+              /* Staggered entrance; capped so a long grid doesn't crawl. */
+              style={{ animationDelay: `${Math.min(i, 8) * 35}ms` }}
+            >
+              <div className="photo-tile" style={{ background: bg, color: fg }} aria-hidden="true">
+                <Icon size={26} strokeWidth={1.75} />
               </div>
               <div className="p-name">{p.name}</div>
               <div className="p-price">₹{p.price}</div>

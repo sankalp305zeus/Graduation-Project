@@ -38,7 +38,11 @@ export default function DiscoveryCard({ product, persona, deficit, onAccept, onD
         </div>
       </div>
 
-      <button className="why-toggle" onClick={() => setShowWhy((v) => !v)}>
+      <button
+        className="why-toggle"
+        onClick={() => setShowWhy((v) => !v)}
+        aria-expanded={showWhy}
+      >
         {showWhy ? 'Hide reason' : 'Why am I seeing this?'}
       </button>
 

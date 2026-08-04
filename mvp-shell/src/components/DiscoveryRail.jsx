@@ -11,19 +11,19 @@ import { findThemeForCategory } from '../data/mockThemes'
  * reasonably infer a model chose these products. It didn't — the pick is
  * arithmetic on price against the checkout gap.
  */
-function RailCard({ product, persona, onAdd }) {
+function RailCard({ product, persona, onAdd, index = 0 }) {
   const [showWhy, setShowWhy] = useState(false)
   const { Icon, fg, bg } = getCategoryIcon(product.category)
   const theme = findThemeForCategory(product.category)
 
   return (
-    <div className="rail-card">
+    <div className="rail-card" style={{ animationDelay: `${index * 55}ms` }}>
       <span className="cat-tag" style={{ background: bg, color: fg }}>
         {product.category}
       </span>
 
-      <div className="icon-tile lg rail-icon" style={{ background: bg, color: fg }} aria-hidden="true">
-        <Icon size={24} strokeWidth={1.9} />
+      <div className="photo-tile lg rail-icon" style={{ background: bg, color: fg }} aria-hidden="true">
+        <Icon size={26} strokeWidth={1.75} />
       </div>
 
       <div className="rail-name">{product.name}</div>
@@ -79,8 +79,8 @@ export default function DiscoveryRail({ products, persona, onAdd }) {
       </div>
 
       <div className="discovery-rail">
-        {products.map((p) => (
-          <RailCard key={p.id} product={p} persona={persona} onAdd={onAdd} />
+        {products.map((p, i) => (
+          <RailCard key={p.id} product={p} persona={persona} onAdd={onAdd} index={i} />
         ))}
       </div>
     </section>

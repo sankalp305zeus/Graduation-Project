@@ -133,9 +133,15 @@ export default function App() {
             <ShoppingCart size={19} strokeWidth={2.5} aria-hidden="true" />
             QuickCart
           </div>
-          <div className="subtitle">
-            Discovery Concierge prototype{!isConfigured && ' — mock data (Supabase not connected)'}
-          </div>
+          <div className="subtitle">Discovery Concierge prototype</div>
+          {/* Same message as before, restyled as a deliberate demo-mode
+              indicator rather than an error. Wording must stay this explicit. */}
+          {!isConfigured && (
+            <span className="demo-badge">
+              <span className="demo-dot" aria-hidden="true" />
+              Demo mode — mock data (Supabase not connected)
+            </span>
+          )}
         </div>
 
         <PersonaSwitcher personas={personas} activeId={activeId} onSelect={handleSwitchPersona} />
