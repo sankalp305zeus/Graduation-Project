@@ -4,6 +4,7 @@ import PersonaSwitcher from './components/PersonaSwitcher'
 import CategoryGrid from './components/CategoryGrid'
 import CartPanel from './components/CartPanel'
 import DiscoveryCard from './components/DiscoveryCard'
+import DiscoveryRail from './components/DiscoveryRail'
 import { fetchPersonas, fetchProducts, logEvent, isConfigured } from './supabaseClient'
 
 const FREE_DELIVERY_THRESHOLD = 199
@@ -24,6 +25,28 @@ function pickRecommendation(products, persona, deficit) {
   }))
   scored.sort((a, b) => a.score - b.score)
   return scored[0].product
+}
+
+// The rail below the filler card. Also deterministic: same never-tried pool,
+// minus whatever the filler card already took, interleaved across the
+// persona's never-tried categories so the rail shows more than one category
+// tag rather than three cards from the same one.
+const RAIL_SIZE = 3
+function pickRail(products, persona, exclude) {
+  const pool = products.filter(
+    (p) => persona.never_tried.includes(p.category) && p.id !== exclude?.id
+  )
+
+  const byCategory = persona.never_tried.map((c) => pool.filter((p) => p.category === c))
+  const rail = []
+  for (let round = 0; rail.length < RAIL_SIZE; round += 1) {
+    const before = rail.length
+    for (const bucket of byCategory) {
+      if (bucket[round] && rail.length < RAIL_SIZE) rail.push(bucket[round])
+    }
+    if (rail.length === before) break // pool exhausted
+  }
+  return rail
 }
 
 export default function App() {
@@ -62,6 +85,11 @@ export default function App() {
     if (!showDiscovery || !persona) return null
     return pickRecommendation(products, persona, deficit)
   }, [showDiscovery, persona, products, deficit])
+
+  const railProducts = useMemo(() => {
+    if (!showDiscovery || !persona) return []
+    return pickRail(products, persona, recommendation)
+  }, [showDiscovery, persona, products, recommendation])
 
   function handleSwitchPersona(id) {
     setActiveId(id)
@@ -130,6 +158,10 @@ export default function App() {
             onAccept={handleAccept}
             onDismiss={handleDismiss}
           />
+        )}
+
+        {showDiscovery && recommendation && !justAccepted && (
+          <DiscoveryRail products={railProducts} persona={persona} onAdd={handleAdd} />
         )}
       </div>
     </div>
