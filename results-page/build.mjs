@@ -122,6 +122,15 @@ const injected =
   html.slice(b);
 fs.writeFileSync(htmlPath, injected);
 
+// Publish a copy into the Vercel app's static dir. Vite copies publicDir
+// verbatim into dist/, so this lands at /results on the deployed site.
+// Generated here rather than copied by hand so the published page can't
+// silently drift from results-page/ after a re-run.
+const publishDir = path.resolve(here, '../mvp-shell/public/results');
+fs.mkdirSync(publishDir, { recursive: true });
+fs.writeFileSync(path.join(publishDir, 'index.html'), injected);
+fs.writeFileSync(path.join(publishDir, 'data.json'), `${JSON.stringify(payload, null, 2)}\n`);
+
 const unresolved = themes.reduce(
   (n, t) => n + Math.max(0, Math.min(2, t.evidence_ids.length) - t.snippets.length),
   0
@@ -132,3 +141,4 @@ console.log(`hallucinated ids:  ${payload.validator.hallucinated_ids_total}`);
 console.log(`snippets resolved: ${themes.reduce((n, t) => n + t.snippets.length, 0)}`);
 if (unresolved > 0) console.log(`snippets unresolved (id not in corpus): ${unresolved}`);
 console.log('wrote data.json + inlined payload into index.html');
+console.log(`published to:      ${path.relative(path.resolve(here, '..'), publishDir)} (serves at /results)`);
