@@ -26,8 +26,11 @@
  * Usage:  node workflows/validate_workflow.mjs [path-to-workflow.json]
  */
 import fs from 'fs';
+import { fileURLToPath } from 'url';
 
-const path = process.argv[2] ?? new URL('./02-theme-extraction.json', import.meta.url).pathname;
+// fileURLToPath, not URL.pathname — on Windows .pathname yields "/C:/..." which
+// fs then resolves to "C:\C:\..." and the read fails with ENOENT.
+const path = process.argv[2] ?? fileURLToPath(new URL('./02-theme-extraction.json', import.meta.url));
 const wf = JSON.parse(fs.readFileSync(path, 'utf8'));
 
 let failures = 0;

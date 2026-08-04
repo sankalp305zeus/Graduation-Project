@@ -1,5 +1,7 @@
 import fs from 'fs';
-const wf = JSON.parse(fs.readFileSync(new URL('./02-theme-extraction.json', import.meta.url).pathname,'utf8'));
+import { fileURLToPath } from 'url';
+// fileURLToPath, not URL.pathname — see validate_workflow.mjs (Windows "C:\C:\..." bug).
+const wf = JSON.parse(fs.readFileSync(fileURLToPath(new URL('./02-theme-extraction.json', import.meta.url)),'utf8'));
 const code = (name) => wf.nodes.find(n => n.name === name).parameters.jsCode;
 
 // Run an n8n Code node body with mocked $input / $ globals.
