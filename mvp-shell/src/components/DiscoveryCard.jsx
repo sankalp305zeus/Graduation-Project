@@ -1,33 +1,41 @@
 import { useState } from 'react'
-import { iconFor } from '../data/categoryIcons'
+import { Sparkle } from 'lucide-react'
+import { getCategoryIcon } from '../data/categoryIcons'
+import { findThemeForCategory } from '../data/mockThemes'
 import { GROUNDING_THEME, CORPUS } from '../data/groundingTheme'
 
 export default function DiscoveryCard({ product, persona, deficit, onAccept, onDismiss }) {
   const [showWhy, setShowWhy] = useState(false)
-  const { Icon, tint, ink } = iconFor(product.category)
+  const { Icon, fg, bg } = getCategoryIcon(product.category)
+  const theme = findThemeForCategory(product.category)
   const habit = persona.always_orders[0]
 
   return (
     <div className="discovery-card">
-      <div className="discovery-eyebrow">New category opportunity: {product.category}</div>
+      <div className="discovery-eyebrow">
+        <Sparkle size={13} strokeWidth={2.5} aria-hidden="true" />
+        New category opportunity
+      </div>
+
+      <div className="discovery-headline">{product.category}</div>
+      <div className="discovery-subline">
+        {persona.name} orders {habit} regularly but has never tried this category.
+        <span className="discovery-deficit">₹{deficit} from free delivery</span>
+      </div>
 
       <div className="discovery-main">
-        <div className="discovery-icon" style={{ background: tint }}>
-          <Icon size={26} color={ink} strokeWidth={1.8} aria-hidden="true" />
+        <div className="icon-tile lg" style={{ background: bg, color: fg }} aria-hidden="true">
+          <Icon size={26} strokeWidth={1.9} />
         </div>
         <div>
           <div className="discovery-name">{product.name}</div>
-          <div className="discovery-reason">
-            {persona.name} orders {habit} on repeat but has never opened{' '}
-            {product.category} — this is the first moment in the journey where
-            trying it costs nothing extra.
-          </div>
+          {theme && (
+            <div className="discovery-reason">
+              Research theme: <strong>{theme.theme_name}</strong>
+            </div>
+          )}
           <div className="discovery-price">₹{product.price}</div>
         </div>
-      </div>
-
-      <div className="discovery-secondary">
-        Checkout gap: ₹{deficit} from free delivery
       </div>
 
       <button className="why-toggle" onClick={() => setShowWhy((v) => !v)}>
@@ -36,23 +44,46 @@ export default function DiscoveryCard({ product, persona, deficit, onAccept, onD
 
       {showWhy && (
         <div className="why-body">
-          <p className="why-line">
-            <strong>Grounded in real review evidence.</strong> The strongest theme
-            in our corpus is “{GROUNDING_THEME.theme_name}” —{' '}
-            <strong>{GROUNDING_THEME.evidence_count} reviews</strong>,{' '}
-            {GROUNDING_THEME.prevalence_pct}% of {GROUNDING_THEME.corpus_total.toLocaleString()}{' '}
-            analyzed. Its trigger is “{GROUNDING_THEME.trigger}”, and the job
-            behind it is to “{GROUNDING_THEME.core_job}”. That is exactly this
-            moment — so a nudge here has to make the bill feel smaller, never
-            larger.
-          </p>
-          <p className="why-line why-caveat">
-            <strong>Prototype logic:</strong> which product gets picked is
-            deterministic matching on {persona.name}'s never-tried categories
-            against the checkout gap — not a model call. Our {CORPUS.themes_extracted}{' '}
-            extracted themes cover delivery, pricing and service quality; none of
-            them evidence per-category discovery, so we don't claim one here.
-          </p>
+          {theme ? (
+            <>
+              <div className="why-theme">{theme.theme_name}</div>
+              <p>{theme.description}</p>
+              <div className="why-evidence">
+                Cited from {theme.evidence_count} evidence review
+                {theme.evidence_count === 1 ? '' : 's'} in the {product.category} cluster.
+              </div>
+              {theme.is_placeholder && (
+                <div className="evidence-flag">
+                  Placeholder theme — not yet from scraped reviews
+                </div>
+              )}
+            </>
+          ) : (
+            <>
+              <p>
+                No research theme has been extracted for {product.category} yet, so this
+                recommendation rests on the pricing fit alone (₹{product.price} against a
+                ₹{deficit} delivery gap).
+              </p>
+              <div className="evidence-flag">No theme evidence available for this category</div>
+            </>
+          )}
+
+          {/* Everything above is per-category and placeholder. This block is
+              the measured half: real output from the n8n extraction run, so
+              the panel always shows at least one number that was actually
+              observed rather than authored. See data/groundingTheme.js. */}
+          <div className="why-measured">
+            <div className="why-measured-label">Measured in the real corpus</div>
+            <p>
+              The strongest theme across {CORPUS.reviews_analyzed.toLocaleString()}{' '}
+              analyzed reviews is “{GROUNDING_THEME.theme_name}” —{' '}
+              <strong>{GROUNDING_THEME.evidence_count} reviews</strong>,{' '}
+              {GROUNDING_THEME.prevalence_pct}% prevalence. Its trigger is “
+              {GROUNDING_THEME.trigger}”, which is this exact moment — so a nudge
+              here has to make the bill feel smaller, never larger.
+            </p>
+          </div>
         </div>
       )}
 

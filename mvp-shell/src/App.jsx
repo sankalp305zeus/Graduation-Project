@@ -101,7 +101,10 @@ export default function App() {
     <div className="phone-frame">
       <div className="app-scroll">
         <div className="app-header">
-          <div className="brand"><ShoppingCart size={17} strokeWidth={2.2} aria-hidden="true" /> QuickCart</div>
+          <div className="brand">
+            <ShoppingCart size={19} strokeWidth={2.5} aria-hidden="true" />
+            QuickCart
+          </div>
           <div className="subtitle">
             Discovery Concierge prototype{!isConfigured && ' — mock data (Supabase not connected)'}
           </div>
