@@ -1,21 +1,33 @@
 import { useState } from 'react'
+import { iconFor } from '../data/categoryIcons'
+import { GROUNDING_THEME, CORPUS } from '../data/groundingTheme'
 
 export default function DiscoveryCard({ product, persona, deficit, onAccept, onDismiss }) {
   const [showWhy, setShowWhy] = useState(false)
+  const { Icon, tint, ink } = iconFor(product.category)
+  const habit = persona.always_orders[0]
 
   return (
     <div className="discovery-card">
-      <div className="discovery-eyebrow">You're ₹{deficit} from free delivery</div>
+      <div className="discovery-eyebrow">New category opportunity: {product.category}</div>
 
       <div className="discovery-main">
-        <div className="discovery-emoji">{product.image_emoji}</div>
+        <div className="discovery-icon" style={{ background: tint }}>
+          <Icon size={26} color={ink} strokeWidth={1.8} aria-hidden="true" />
+        </div>
         <div>
           <div className="discovery-name">{product.name}</div>
           <div className="discovery-reason">
-            From {product.category} — a category {persona.name} hasn't tried yet
+            {persona.name} orders {habit} on repeat but has never opened{' '}
+            {product.category} — this is the first moment in the journey where
+            trying it costs nothing extra.
           </div>
           <div className="discovery-price">₹{product.price}</div>
         </div>
+      </div>
+
+      <div className="discovery-secondary">
+        Checkout gap: ₹{deficit} from free delivery
       </div>
 
       <button className="why-toggle" onClick={() => setShowWhy((v) => !v)}>
@@ -24,15 +36,23 @@ export default function DiscoveryCard({ product, persona, deficit, onAccept, onD
 
       {showWhy && (
         <div className="why-body">
-          {/* PLACEHOLDER — replace with a real citation once the discovery
-              engine's theme data is wired in, e.g.:
-              "Users like {persona.name} who buy {persona.always_orders[0]}
-              regularly are 3x more likely to try {product.category} when
-              it's offered at checkout. Based on {N} evidenced reviews." */}
-          Mock reasoning for the prototype: this product is priced close to
-          your delivery-fee gap and comes from a category {persona.name}
-          hasn't ordered before. Once the discovery engine is connected,
-          this will cite a real research theme with supporting review evidence.
+          <p className="why-line">
+            <strong>Grounded in real review evidence.</strong> The strongest theme
+            in our corpus is “{GROUNDING_THEME.theme_name}” —{' '}
+            <strong>{GROUNDING_THEME.evidence_count} reviews</strong>,{' '}
+            {GROUNDING_THEME.prevalence_pct}% of {GROUNDING_THEME.corpus_total.toLocaleString()}{' '}
+            analyzed. Its trigger is “{GROUNDING_THEME.trigger}”, and the job
+            behind it is to “{GROUNDING_THEME.core_job}”. That is exactly this
+            moment — so a nudge here has to make the bill feel smaller, never
+            larger.
+          </p>
+          <p className="why-line why-caveat">
+            <strong>Prototype logic:</strong> which product gets picked is
+            deterministic matching on {persona.name}'s never-tried categories
+            against the checkout gap — not a model call. Our {CORPUS.themes_extracted}{' '}
+            extracted themes cover delivery, pricing and service quality; none of
+            them evidence per-category discovery, so we don't claim one here.
+          </p>
         </div>
       )}
 

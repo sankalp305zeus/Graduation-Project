@@ -262,31 +262,32 @@ h1, h2, h3, .display {
   to { opacity: 1; transform: translateY(0); }
 }
 
+/* Not uppercase any more — this is a full sentence now ("New category
+   opportunity: Personal Care & Beauty"), and all-caps at 11px makes a
+   string that long noticeably harder to read. */
 .discovery-eyebrow {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.1px;
   color: var(--green-dark);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .discovery-main {
   display: flex;
   gap: 12px;
-  align-items: center;
+  align-items: flex-start;
 }
 
-.discovery-emoji {
-  font-size: 34px;
-  background: white;
-  border-radius: 12px;
+.discovery-icon {
+  border-radius: 14px;
   width: 56px;
   height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
   flex: none;
+  align-self: flex-start;
 }
 
 .discovery-name {
@@ -297,13 +298,24 @@ h1, h2, h3, .display {
 .discovery-reason {
   font-size: 12.5px;
   color: var(--ink-soft);
-  margin-top: 2px;
+  margin-top: 3px;
+  line-height: 1.4;
 }
 
 .discovery-price {
   font-weight: 700;
   font-size: 13px;
-  margin-top: 4px;
+  margin-top: 6px;
+}
+
+/* The delivery-fee deficit is now a secondary supporting fact, not the
+   headline — the occasion/pattern framing leads instead. */
+.discovery-secondary {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(0,0,0,0.10);
 }
 
 .why-toggle {
@@ -324,7 +336,18 @@ h1, h2, h3, .display {
   border-radius: 8px;
   padding: 10px;
   margin-top: 8px;
-  line-height: 1.4;
+  line-height: 1.45;
+}
+
+.why-line { margin: 0; }
+.why-line + .why-line { margin-top: 9px; }
+
+/* Visually separates what's evidenced from what's prototype logic, so the
+   distinction survives someone skimming the panel. */
+.why-caveat {
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
+  color: #6E6A62;
 }
 
 .discovery-actions {
