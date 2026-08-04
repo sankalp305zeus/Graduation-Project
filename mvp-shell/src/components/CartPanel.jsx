@@ -1,3 +1,5 @@
+import { iconFor } from '../data/categoryIcons'
+
 export default function CartPanel({ cartItems, subtotal, threshold }) {
   const deficit = Math.max(0, threshold - subtotal)
   const pct = Math.min(100, Math.round((subtotal / threshold) * 100))
@@ -10,12 +12,18 @@ export default function CartPanel({ cartItems, subtotal, threshold }) {
       ) : (
         // Keyed by index too: the same product can legitimately be added
         // twice, and item.id alone made React warn about duplicate keys.
-        cartItems.map((item, i) => (
-          <div className="cart-item-row" key={`${item.id}-${i}`}>
-            <span>{item.image_emoji} {item.name}</span>
-            <span>₹{item.price}</span>
-          </div>
-        ))
+        cartItems.map((item, i) => {
+          const { Icon, ink } = iconFor(item.category)
+          return (
+            <div className="cart-item-row" key={`${item.id}-${i}`}>
+              <span className="cart-item-name">
+                <Icon size={14} color={ink} strokeWidth={2} aria-hidden="true" />
+                {item.name}
+              </span>
+              <span>₹{item.price}</span>
+            </div>
+          )
+        })
       )}
 
       <div className="threshold-bar-track">

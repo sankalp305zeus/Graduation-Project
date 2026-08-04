@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { ShoppingCart } from 'lucide-react'
 import PersonaSwitcher from './components/PersonaSwitcher'
 import CategoryGrid from './components/CategoryGrid'
 import CartPanel from './components/CartPanel'
@@ -100,7 +101,7 @@ export default function App() {
     <div className="phone-frame">
       <div className="app-scroll">
         <div className="app-header">
-          <div className="brand">🛒 QuickCart</div>
+          <div className="brand"><ShoppingCart size={17} strokeWidth={2.2} aria-hidden="true" /> QuickCart</div>
           <div className="subtitle">
             Discovery Concierge prototype{!isConfigured && ' — mock data (Supabase not connected)'}
           </div>
