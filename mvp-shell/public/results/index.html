@@ -37,7 +37,14 @@
   .page-head { border-bottom: 1px solid var(--divider); padding-bottom: 24px; margin-bottom: 36px; }
   h1 { font-size: 28pt; font-weight: 700; letter-spacing: -0.4px; margin: 0 0 10px; line-height: 1.15; }
   .timestamp { font-size: 14pt; color: var(--secondary); margin: 0; }
-  .run-meta { font-size: 14pt; color: var(--secondary); margin: 6px 0 0; }
+  .run-context {
+    font-size: 14pt;
+    color: var(--secondary);
+    margin: 10px 0 0;
+    max-width: 76ch;
+    line-height: 1.5;
+  }
+  .run-meta { font-size: 14pt; color: var(--secondary); margin: 8px 0 0; }
 
   h2 {
     font-size: 20pt; font-weight: 600; letter-spacing: -0.2px;
@@ -45,16 +52,25 @@
   }
 
   /* ---------- Agent cards ---------- */
-  .agents { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 44px; }
+  /* Tighter gap than the theme grid so the three read as one matched status
+     set rather than three independent cards. Equal-height rows + the job text
+     pinned to the bottom keeps them aligned regardless of description length. */
+  .agents {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    grid-auto-rows: 1fr;
+    margin-bottom: 48px;
+  }
   .agent-card {
     background: var(--surface);
     border: 1px solid var(--divider);
-    border-radius: 10px;
-    padding: 20px;
+    border-radius: 12px;
+    padding: 18px;
     display: flex; flex-direction: column; gap: 10px;
   }
-  .agent-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-  .agent-name { font-size: 16pt; font-weight: 600; line-height: 1.3; }
+  .agent-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .agent-name { font-size: 16pt; font-weight: 600; line-height: 1.3; display: flex; align-items: center; gap: 8px; }
   .agent-job { font-size: 14pt; color: var(--secondary); margin: 0; }
   .agent-status {
     display: inline-flex; align-items: center; gap: 6px;
@@ -63,12 +79,15 @@
   }
 
   /* ---------- Theme cards ---------- */
-  .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 16px; }
+  .themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 22px; }
   .theme-card {
     background: var(--surface);
-    border: 1px solid var(--divider);
-    border-radius: 10px;
-    padding: 20px;
+    /* Soft border: the divider tone at partial strength plus a low-contrast
+       shadow, so cards separate from the warm background without a hard rule. */
+    border: 1px solid rgba(227, 224, 216, 0.85);
+    border-radius: 12px;
+    box-shadow: 0 1px 2px rgba(16, 20, 24, 0.04);
+    padding: 24px;
     display: flex; flex-direction: column;
   }
   .theme-name { font-size: 17pt; font-weight: 600; line-height: 1.28; margin: 0 0 8px; }
@@ -151,8 +170,13 @@
 <body>
 <div class="wrap">
   <header class="page-head">
-    <h1>Extraction Complete</h1>
+    <h1>Reference corpus analysis</h1>
     <p class="timestamp" id="timestamp">—</p>
+    <p class="run-context">
+      This is the full production run (1,180 reviews, local Ollama pipeline) —
+      the same workflow you just tested live processes your submitted sample
+      through identical agents and validation, at smaller scale for demo speed.
+    </p>
     <p class="run-meta" id="run-meta"></p>
   </header>
 
