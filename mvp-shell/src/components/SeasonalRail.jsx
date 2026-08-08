@@ -32,19 +32,19 @@ export default function SeasonalRail({ context, products }) {
 
       <div className="seasonal-rail">
         {products.map((p, i) => {
-          const { Icon, fg, bg } = getCategoryIcon(p.category)
+          const { Icon, fg, bg, short } = getCategoryIcon(p.category)
           return (
             <div
               className="seasonal-card"
               key={p.id}
               style={{ animationDelay: `${i * 55}ms` }}
             >
-              <span className="cat-tag" style={{ background: bg, color: fg }}>
-                {p.category}
-              </span>
               <div className="photo-tile lg" style={{ background: bg, color: fg }} aria-hidden="true">
                 <Icon size={26} strokeWidth={1.75} />
               </div>
+              <span className="cat-chip" style={{ background: bg, color: fg }} title={p.category}>
+                {short}
+              </span>
               <div className="rail-name">{p.name}</div>
               <div className="rail-price">₹{p.price}</div>
             </div>

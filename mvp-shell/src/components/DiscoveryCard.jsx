@@ -6,7 +6,7 @@ import { GROUNDING_THEME, CORPUS } from '../data/groundingTheme'
 
 export default function DiscoveryCard({ product, persona, deficit, onAccept, onDismiss }) {
   const [showWhy, setShowWhy] = useState(false)
-  const { Icon, fg, bg } = getCategoryIcon(product.category)
+  const { Icon, fg, bg, short } = getCategoryIcon(product.category)
   const theme = findThemeForCategory(product.category)
   const habit = persona.always_orders[0]
 
@@ -28,10 +28,13 @@ export default function DiscoveryCard({ product, persona, deficit, onAccept, onD
       </div>
 
       <div className="discovery-main">
-        <div className="icon-tile lg" style={{ background: bg, color: fg }} aria-hidden="true">
+        <div className="photo-tile lg" style={{ background: bg, color: fg }} aria-hidden="true">
           <Icon size={26} strokeWidth={1.9} />
         </div>
         <div>
+          <span className="cat-chip" style={{ background: bg, color: fg }} title={product.category}>
+            {short}
+          </span>
           <div className="discovery-name">{product.name}</div>
           {theme && (
             <div className="discovery-reason">

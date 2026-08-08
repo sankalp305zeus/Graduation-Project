@@ -267,6 +267,14 @@ h1, h2, h3, .display {
   line-height: 1.3;
   min-height: 30px;
   color: var(--ink-soft);
+  /* Two-line clamp, same as .rail-name. min-height alone only covered 1-2
+     lines; a 3-line name ("Fresh Bananas (dozen)") stretched its whole grid
+     row, so rows sat at different heights. Clamping pins every card to the
+     same height regardless of name length. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 /* Price is the decision anchor on these tiles — bumped and darkened so it
@@ -422,10 +430,11 @@ h1, h2, h3, .display {
   align-items: center;
 }
 
-.discovery-main .icon-tile.lg {
-  background: white;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.04);
-}
+/* The discovery card's tile was .icon-tile.lg with a white-background
+   override here. It now uses .photo-tile.lg like the grid, rail and seasonal
+   cards, so all four surfaces share one treatment and this override is gone.
+   (Its `background: white` never applied anyway — the inline category tint on
+   the element outranked it.) */
 
 .discovery-name {
   font-weight: 700;
@@ -614,18 +623,39 @@ h1, h2, h3, .display {
   gap: 8px;
 }
 
-.cat-tag {
+/* Category chip. Sits below the image tile and above the product name on
+   every surface — grid, discovery card, rail and seasonal rail — so the
+   reading order is identical everywhere.
+
+   Quiet by design: 11px at weight 600, no uppercase, no letter-spacing, and
+   only a soft tint of the category's own colour pair. It should label the
+   card, not compete with the price or the product name.
+
+   nowrap + ellipsis is a safety net, not the strategy. Short display names
+   (categoryIcons.js `short`) are sized to fit the narrowest card on one line;
+   this just guarantees a future long label can never wrap and give one card a
+   two-line chip while its neighbours have one. */
+.cat-chip {
+  display: inline-block;
   align-self: flex-start;
   max-width: 100%;
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.2px;
-  padding: 3px 8px;
-  border-radius: 999px;
+  margin: 8px 0 0;
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Grid cards are centre-aligned, so the chip centres with them. */
+.product-card .cat-chip { margin: 9px auto 0; display: block; width: fit-content; }
+
+/* On the discovery card the chip is the first thing in the text column, so it
+   needs no top margin — the tile beside it already sets the block's top. */
+.discovery-main .cat-chip { margin-top: 0; margin-bottom: 5px; }
 
 .rail-icon { margin-top: 2px; }
 

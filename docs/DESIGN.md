@@ -18,7 +18,32 @@ the interface implying something the data doesn't support.
 
 **Decided:** product tiles present the category icon as a product thumbnail
 would be presented — larger, squared, soft shadow, subtle inner highlight — at
-72px in the grid and 56px on cards. No photography is used.
+72px in the product grid and 56px on the discovery card, rail cards and
+seasonal cards. No photography is used.
+
+All four surfaces now share the one `.photo-tile` treatment. The discovery
+card was briefly the exception, using `.icon-tile` with a separate override;
+that was an oversight rather than a decision, and is now aligned.
+
+### The category chip
+
+Each product card carries a small category chip, below the tile and above the
+product name, in that order on every surface.
+
+It shows a **shortened** category label (Groceries, Snacks, Personal,
+Electronics…) rather than the full name, because a grid card gives the chip
+only ~80px of inner width and just **1 of the 12 full names fits** — "Groceries
+& Fresh Produce" alone needs 155px. Truncating would render most chips as
+"Grocer…", and wrapping would give some cards a two-line chip and others one,
+breaking the grid's rhythm. The short forms all fit on one line at the
+narrowest card; `nowrap` + ellipsis stays as a safety net, not the strategy.
+
+The full category name is preserved in a `title` attribute, so hover and
+assistive technology still get it.
+
+**Source:**
+[`mvp-shell/src/data/categoryIcons.js`](../mvp-shell/src/data/categoryIcons.js)
+— the `short` field.
 
 **Why:** a generic stock photo sitting under a specific product name is
 fabricated product imagery. Product names are now generic by design precisely

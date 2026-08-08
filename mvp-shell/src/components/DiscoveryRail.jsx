@@ -13,18 +13,19 @@ import { findThemeForCategory } from '../data/mockThemes'
  */
 function RailCard({ product, persona, onAdd, index = 0 }) {
   const [showWhy, setShowWhy] = useState(false)
-  const { Icon, fg, bg } = getCategoryIcon(product.category)
+  const { Icon, fg, bg, short } = getCategoryIcon(product.category)
   const theme = findThemeForCategory(product.category)
 
   return (
     <div className="rail-card" style={{ animationDelay: `${index * 55}ms` }}>
-      <span className="cat-tag" style={{ background: bg, color: fg }}>
-        {product.category}
-      </span>
-
       <div className="photo-tile lg rail-icon" style={{ background: bg, color: fg }} aria-hidden="true">
         <Icon size={26} strokeWidth={1.75} />
       </div>
+
+      {/* Below the tile, above the name — same order on every surface. */}
+      <span className="cat-chip" style={{ background: bg, color: fg }} title={product.category}>
+        {short}
+      </span>
 
       <div className="rail-name">{product.name}</div>
       <div className="rail-price">₹{product.price}</div>
