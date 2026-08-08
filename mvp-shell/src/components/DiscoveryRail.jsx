@@ -59,8 +59,9 @@ function RailCard({ product, persona, onAdd, index = 0 }) {
             </p>
           )}
           <p className="rail-why-caveat">
-            Chosen by deterministic matching on {persona.name}'s never-tried
-            categories against the checkout gap — not a model call.
+            Chosen by deterministic matching on categories outside{' '}
+            {persona.name}'s usual basket, priced to fit the checkout gap — not
+            a model call.
           </p>
         </div>
       )}

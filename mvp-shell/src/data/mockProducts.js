@@ -43,4 +43,18 @@ export const mockProducts = [
   { id: 'p31', name: 'Gift Wrap Set', category: 'Toys & Gifting', price: 55, image_emoji: '🎁' },
   { id: 'p32', name: 'Small Puzzle Toy', category: 'Toys & Gifting', price: 79, image_emoji: '🧩' },
   { id: 'p33', name: 'Greeting Card', category: 'Toys & Gifting', price: 40, image_emoji: '💌' },
+
+  // Demo catalog entries. No review-corpus evidence backs this category —
+  // findThemeForCategory returns nothing for it, so the "Why this?" panel
+  // correctly says no theme has been extracted rather than inventing one.
+  //
+  // PRICES CHOSEN FOR DEMO VISIBILITY, not from real pricing. The rail ranks
+  // categories by how closely their best item matches the checkout gap, and
+  // ties break toward whatever appears earlier in this file — which
+  // permanently buried a category added last. 47/63/76 are unclaimed points
+  // in the existing price ladder spread across the 40-80 discovery window, so
+  // this category wins outright at those gaps instead of losing every tie.
+  { id: 'p34', name: 'Electrolyte Hydration Sachets', category: 'Sports & Fitness', price: 47, image_emoji: '🥤' },
+  { id: 'p35', name: 'Whey Protein Single Serve', category: 'Sports & Fitness', price: 63, image_emoji: '🥛' },
+  { id: 'p36', name: 'Resistance Band (medium)', category: 'Sports & Fitness', price: 76, image_emoji: '🏋️' },
 ]

@@ -19,7 +19,7 @@ export default function DiscoveryCard({ product, persona, deficit, onAccept, onD
 
       <div className="discovery-headline">{product.category}</div>
       <div className="discovery-subline">
-        {persona.name} orders {habit} regularly but has never tried this category.
+        {persona.name} orders {habit} regularly — this category isn't part of that usual basket.
         <span className="discovery-deficit">₹{deficit} from free delivery</span>
       </div>
 
@@ -57,9 +57,19 @@ export default function DiscoveryCard({ product, persona, deficit, onAccept, onD
                 {theme.evidence_count === 1 ? '' : 's'} in the {product.category} cluster.
               </div>
               {theme.is_placeholder && (
-                <div className="evidence-flag">
-                  Placeholder theme — not yet from scraped reviews
-                </div>
+                <>
+                  <div className="evidence-flag">
+                    Seeded theme — not from scraped reviews
+                  </div>
+                  {/* Explains the badge directly above it, rather than being
+                      appended to the mechanism disclosure at the bottom where
+                      it read as an apology for the work. */}
+                  <p className="evidence-flag-note">
+                    Review corpora capture what went wrong, not what a user never
+                    considered — so category-level evidence comes from primary
+                    research rather than scraped reviews.
+                  </p>
+                </>
               )}
             </>
           ) : (
@@ -94,12 +104,9 @@ export default function DiscoveryCard({ product, persona, deficit, onAccept, onD
               them justifies the pick — without this line a reader can
               reasonably infer a model made the choice. It did not. */}
           <div className="why-caveat">
-            <strong>How this pick was made:</strong> deterministic matching on{' '}
-            {persona.name}'s never-tried categories against the ₹{deficit}{' '}
-            checkout gap — prototype logic, not a model call. The{' '}
-            {CORPUS.themes_extracted} themes extracted from real reviews cover
-            delivery, pricing and service quality; none evidence per-category
-            discovery, which is why the theme above is a placeholder.
+            <strong>How this pick was made:</strong> deterministic price-fit
+            against the ₹{deficit} checkout gap, limited to categories outside{' '}
+            {persona.name}'s usual basket — prototype logic, not a model call.
           </div>
         </div>
       )}

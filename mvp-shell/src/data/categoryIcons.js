@@ -10,6 +10,7 @@ import {
   Pill,
   NotebookPen,
   Gift,
+  Dumbbell,
   Package,
 } from 'lucide-react'
 
@@ -29,6 +30,7 @@ export const CATEGORY_ICONS = {
   'Pharmacy & Health': { Icon: Pill, fg: '#B23A48', bg: '#FCE9EB' },
   'Stationery & Books': { Icon: NotebookPen, fg: '#3F6C5F', bg: '#E8F2EE' },
   'Toys & Gifting': { Icon: Gift, fg: '#C2456B', bg: '#FCE7EE' },
+  'Sports & Fitness': { Icon: Dumbbell, fg: '#1F6F6B', bg: '#E4F3F2' },
 }
 
 // Unknown category -> neutral tile rather than a crash or an empty gap.
