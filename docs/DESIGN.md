@@ -20,18 +20,35 @@ the interface implying something the data doesn't support.
 would be presented — larger, squared, soft shadow, subtle inner highlight — at
 72px in the grid and 56px on cards. No photography is used.
 
-**Why:** every product in the catalog is a real brand (Amul, Lays, Nivea,
-Harpic, Britannia). A generic stock photo placed under a branded product name
-is fabricated product imagery, and it would also introduce an external CDN
-dependency the demo doesn't need.
+**Why:** a generic stock photo sitting under a specific product name is
+fabricated product imagery. Product names are now generic by design precisely
+so no stock image can be misattributed to a real brand. Photography would also
+introduce an external CDN dependency the demo doesn't need.
 
-> No stock photography: every product here is a real brand (Amul, Lays,
-> Nivea…), so a generic Unsplash shot under a branded name would be fabricated
-> product imagery. Instead the category icon is presented the way a product
-> thumbnail would be […] so tiles read as imagery, not bare icons.
+> No stock photography, and product names are generic by design so that no
+> stock image can be misattributed to a real brand — a generic shot sitting
+> under a branded product name would be fabricated product imagery.
 
-**Source:** [`mvp-shell/src/index.css`](../mvp-shell/src/index.css) — the
-`.photo-tile` rule.
+### How this decision evolved
+
+Worth keeping visible, because the reasoning inverted rather than disappeared:
+
+1. **Originally** the catalog used real brand names — Amul Milk, Lays Chips,
+   Nivea Face Wash, Harpic, Britannia, Pampers, Pedigree, Vim, Coca-Cola.
+   Stock photography was rejected *because* of them: a generic milk carton
+   captioned "Amul Milk 1L" would be fabricated imagery for a named brand.
+   That constraint is what produced the photo-tile treatment.
+2. **Later** all nine were renamed to generic descriptors (Milk 1L, Potato
+   Chips Party Pack, Face Wash 100ml, and so on), which removed the original
+   constraint entirely.
+3. **The tiles stayed**, and the rationale now runs the other way: names are
+   generic *so that* stock imagery could never be misattributed. The
+   no-external-CDN argument is unaffected either way.
+
+**Sources:** [`mvp-shell/src/index.css`](../mvp-shell/src/index.css) — the
+`.photo-tile` rule; and
+[`mvp-shell/src/data/mockProducts.js`](../mvp-shell/src/data/mockProducts.js)
+— header comment on generic naming.
 
 ---
 

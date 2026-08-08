@@ -1,8 +1,11 @@
 import { runGuardrails } from './guardrails.js'
 
+// Names mirror the real catalog in src/data/mockProducts.js so the same ids
+// don't carry different names in two places. Nothing here reads the catalog at
+// runtime — these are fixtures — but a mismatch is confusing to cross-check.
 const validProducts = [
-  { id: 'p10', name: 'Nivea Face Wash 100ml', category: 'Personal Care & Beauty', price: 199 },
-  { id: 'p01', name: 'Amul Milk 1L', category: 'Groceries & Fresh Produce', price: 66 },
+  { id: 'p10', name: 'Face Wash 100ml', category: 'Personal Care & Beauty', price: 199 },
+  { id: 'p01', name: 'Milk 1L', category: 'Groceries & Fresh Produce', price: 66 },
 ]
 const validThemes = [
   { id: 'th_001', category: 'Personal Care & Beauty', evidence_ids: ['rev_001', 'rev_002'] },

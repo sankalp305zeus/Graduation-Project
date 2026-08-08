@@ -220,11 +220,12 @@ h1, h2, h3, .display {
 
 .product-card .icon-tile { margin: 0 auto; }
 
-/* Photo-tile treatment. No stock photography: every product here is a real
-   brand (Amul, Lays, Nivea…), so a generic Unsplash shot under a branded
-   name would be fabricated product imagery. Instead the category icon is
-   presented the way a product thumbnail would be — larger, squarer, soft
-   shadow, subtle inner highlight — so tiles read as imagery, not bare icons. */
+/* Photo-tile treatment. No stock photography, and product names are generic
+   by design so that no stock image can be misattributed to a real brand — a
+   generic shot sitting under a branded product name would be fabricated
+   product imagery. Instead the category icon is presented the way a product
+   thumbnail would be — larger, squarer, soft shadow, subtle inner highlight —
+   so tiles read as imagery, not bare icons. See mockProducts.js. */
 .photo-tile {
   width: 100%;
   max-width: 72px;

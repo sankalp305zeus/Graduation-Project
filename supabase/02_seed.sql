@@ -40,32 +40,32 @@ insert into personas (id, name, age, occupation, city, bio, always_orders, never
 
 insert into products (id, name, category, price, image_emoji) values
 -- Groceries & Fresh Produce
-('p01', 'Amul Milk 1L', 'Groceries & Fresh Produce', 66, '🥛'),
+('p01', 'Milk 1L', 'Groceries & Fresh Produce', 66, '🥛'),
 ('p02', 'Fresh Bananas (dozen)', 'Groceries & Fresh Produce', 60, '🍌'),
 ('p03', 'Tomatoes 1kg', 'Groceries & Fresh Produce', 40, '🍅'),
 
 -- Snacks & Beverages
-('p04', 'Lays Chips Party Pack', 'Snacks & Beverages', 50, '🍟'),
-('p05', 'Coca-Cola 750ml', 'Snacks & Beverages', 45, '🥤'),
-('p06', 'Britannia Cookies', 'Snacks & Beverages', 35, '🍪'),
+('p04', 'Potato Chips Party Pack', 'Snacks & Beverages', 50, '🍟'),
+('p05', 'Cola 750ml', 'Snacks & Beverages', 45, '🥤'),
+('p06', 'Biscuits', 'Snacks & Beverages', 35, '🍪'),
 
 -- Household Essentials
-('p07', 'Vim Dishwash Bar', 'Household Essentials', 25, '🧽'),
-('p08', 'Harpic Toilet Cleaner', 'Household Essentials', 55, '🧴'),
+('p07', 'Dishwash Bar', 'Household Essentials', 25, '🧽'),
+('p08', 'Toilet Cleaner', 'Household Essentials', 55, '🧴'),
 ('p09', 'Tissue Box', 'Household Essentials', 70, '🧻'),
 
 -- Personal Care & Beauty
-('p10', 'Nivea Face Wash 100ml', 'Personal Care & Beauty', 199, '🧴'),
+('p10', 'Face Wash 100ml', 'Personal Care & Beauty', 199, '🧴'),
 ('p11', 'Travel-size Moisturizer 30ml', 'Personal Care & Beauty', 75, '🧴'),
 ('p12', 'Lip Balm', 'Personal Care & Beauty', 45, '💄'),
 
 -- Baby Care
-('p13', 'Pampers Diapers (small pack)', 'Baby Care', 249, '🍼'),
+('p13', 'Diapers (small pack)', 'Baby Care', 249, '🍼'),
 ('p14', 'Baby Wipes', 'Baby Care', 79, '🧴'),
 ('p15', 'Baby Lotion 100ml', 'Baby Care', 65, '🧴'),
 
 -- Pet Supplies
-('p16', 'Pedigree Dog Food 1kg', 'Pet Supplies', 210, '🐕'),
+('p16', 'Dog Food 1kg', 'Pet Supplies', 210, '🐕'),
 ('p17', 'Cat Treats', 'Pet Supplies', 58, '🐱'),
 ('p18', 'Pet Shampoo', 'Pet Supplies', 72, '🐾'),
 
