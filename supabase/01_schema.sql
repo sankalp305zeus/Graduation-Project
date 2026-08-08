@@ -17,8 +17,16 @@ create table if not exists products (
   name text not null,
   category text not null,
   price numeric not null,
-  image_emoji text default '📦'  -- placeholder "image" — swap for real product photos later
+  image_emoji text default '📦',  -- placeholder "image" — swap for real product photos later
+  -- Occasion tags used by the seasonal/festival rail to prefer festive stock
+  -- over generic stock inside the same category. Empty for everyday items.
+  -- Mirrors the optional `occasions` field in mvp-shell/src/data/mockProducts.js.
+  occasions text[] not null default '{}'
 );
+
+-- NOTE for an existing database: `create table if not exists` will NOT add the
+-- occasions column to a products table that already exists. Run this once:
+--   alter table products add column if not exists occasions text[] not null default '{}';
 
 create table if not exists event_log (
   id bigint generated always as identity primary key,
