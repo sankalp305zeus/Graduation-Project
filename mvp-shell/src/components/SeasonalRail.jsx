@@ -22,10 +22,10 @@ export default function SeasonalRail({ context, products }) {
       <div className="seasonal-head">
         <div className="seasonal-title-row">
           <CalendarDays size={14} strokeWidth={2.2} aria-hidden="true" />
+          {/* Occasion only — the month that triggered this stays backend-side. */}
           <h3 id="seasonal-heading" className="seasonal-title">
             {context.label}
           </h3>
-          <span className="seasonal-window">{context.window}</span>
         </div>
         <p className="seasonal-rationale">{context.rationale}</p>
       </div>

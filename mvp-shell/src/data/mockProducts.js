@@ -57,4 +57,21 @@ export const mockProducts = [
   { id: 'p34', name: 'Electrolyte Hydration Sachets', category: 'Sports & Fitness', price: 47, image_emoji: '🥤' },
   { id: 'p35', name: 'Whey Protein Single Serve', category: 'Sports & Fitness', price: 63, image_emoji: '🥛' },
   { id: 'p36', name: 'Resistance Band (medium)', category: 'Sports & Fitness', price: 76, image_emoji: '🏋️' },
+
+  // Occasion stock, so the seasonal section can surface something that
+  // actually reads as festive. Before these existed, Diwali surfaced a steel
+  // storage container — correct by category, meaningless as a suggestion.
+  // Demo catalog data like everything else here; no corpus evidence behind it.
+  { id: 'p37', name: 'Rakhi & Sweets Gift Box', category: 'Toys & Gifting', price: 85, image_emoji: '🎁', occasions: ['raksha-bandhan', 'diwali'] },
+  { id: 'p38', name: 'Diya Set (12 pcs)', category: 'Home & Kitchen', price: 60, image_emoji: '🪔', occasions: ['diwali'] },
+  { id: 'p39', name: 'Decorative String Lights', category: 'Home & Kitchen', price: 99, image_emoji: '✨', occasions: ['diwali'] },
+  { id: 'p40', name: 'Festive Sweets Box', category: 'Snacks & Beverages', price: 120, image_emoji: '🍬', occasions: ['diwali', 'ganesh-chaturthi', 'raksha-bandhan'] },
+  { id: 'p41', name: 'Chocolate Gift Box', category: 'Snacks & Beverages', price: 90, image_emoji: '🍫', occasions: ['valentines', 'raksha-bandhan'] },
+
+  // Monsoon stock. Filed under Household Essentials rather than a new
+  // category — umbrellas and raincoats are seasonal rather than a distinct
+  // shopping category, and one more category would dilute the taxonomy.
+  { id: 'p42', name: 'Compact Umbrella', category: 'Household Essentials', price: 95, image_emoji: '☂️', occasions: ['monsoon'] },
+  { id: 'p43', name: 'Quick-dry Towel', category: 'Household Essentials', price: 74, image_emoji: '🧺', occasions: ['monsoon'] },
+  { id: 'p44', name: 'Light Raincoat', category: 'Household Essentials', price: 149, image_emoji: '🧥', occasions: ['monsoon'] },
 ]

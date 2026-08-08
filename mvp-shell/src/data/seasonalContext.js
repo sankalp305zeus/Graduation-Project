@@ -22,54 +22,63 @@
 
 // Ordered most-specific first. The first rule matching city + month wins, so
 // a city-specific festival outranks a national one, which outranks weather.
+//
+// `months` is backend-only — it decides which rule fires and is never shown.
+// The UI displays the occasion, not the date.
 export const SEASONAL_RULES = [
   {
     id: 'ganesh-chaturthi',
     label: 'Ganesh Chaturthi',
-    window: 'Aug–Sep',
     months: [8, 9],
     cities: ['Mumbai', 'Pune'], // strongest observance of the personas' cities
     categories: ['Home & Kitchen', 'Snacks & Beverages', 'Toys & Gifting'],
-    rationale: 'Home preparation, guests and gifting peak around the festival.',
+    rationale: 'Home preparation, guests and gifting all peak around the festival.',
   },
   {
     id: 'raksha-bandhan',
     label: 'Raksha Bandhan',
-    window: 'August',
     months: [8],
     cities: null, // null = applies to every city
     categories: ['Toys & Gifting', 'Snacks & Beverages', 'Personal Care & Beauty'],
-    rationale: 'Gifting occasion — a rare moment when non-habitual categories get considered.',
+    rationale: 'A gifting occasion — one of the rare moments non-habitual categories get considered.',
   },
   {
-    id: 'sw-monsoon',
+    id: 'diwali',
+    label: 'Diwali',
+    // Lunar calendar, so the date shifts year to year and can fall in either
+    // month. Both are included rather than faking precision we don't have.
+    months: [10, 11],
+    cities: null,
+    categories: ['Home & Kitchen', 'Toys & Gifting', 'Personal Care & Beauty', 'Snacks & Beverages'],
+    rationale: 'Home decoration, gifting and hosting peak across the festival week.',
+  },
+  {
+    id: 'valentines',
+    label: "Valentine's week",
+    months: [2],
+    cities: null,
+    categories: ['Personal Care & Beauty', 'Toys & Gifting', 'Snacks & Beverages'],
+    rationale: 'Gifting week — chocolates, cards and self-care see a sharp, short spike.',
+  },
+  {
+    id: 'cricket-season',
+    label: 'Cricket season',
+    months: [3, 4, 5],
+    cities: null,
+    categories: ['Snacks & Beverages', 'Electronics Accessories', 'Home & Kitchen', 'Sports & Fitness'],
+    rationale: 'Match nights drive snacking, viewing setup and a spike of interest in playing too.',
+  },
+  {
+    id: 'monsoon',
     label: 'Monsoon season',
-    window: 'Jun–Sep',
-    months: [6, 7, 8, 9],
+    // August is covered by the festival rules above, which outrank this.
+    months: [6, 7, 9],
     // Chennai is deliberately excluded: its main rains come from the
     // north-east monsoon (Oct–Dec), not the south-west one. Getting this
     // wrong is the kind of detail that makes a demo feel unconsidered.
     cities: ['Mumbai', 'Pune', 'Bangalore', 'Hyderabad', 'Delhi'],
     categories: ['Household Essentials', 'Pharmacy & Health', 'Home & Kitchen'],
-    rationale: 'Damp weather drives cleaning, drying and seasonal-illness needs.',
-  },
-  {
-    id: 'ne-monsoon',
-    label: 'North-east monsoon',
-    window: 'Oct–Dec',
-    months: [10, 11, 12],
-    cities: ['Chennai'],
-    categories: ['Household Essentials', 'Pharmacy & Health', 'Home & Kitchen'],
-    rationale: 'Chennai’s main rainy season, offset from the rest of the country.',
-  },
-  {
-    id: 'winter',
-    label: 'Winter',
-    window: 'Dec–Jan',
-    months: [12, 1],
-    cities: ['Delhi'],
-    categories: ['Personal Care & Beauty', 'Pharmacy & Health', 'Home & Kitchen'],
-    rationale: 'Dry cold drives skincare and seasonal-health demand.',
+    rationale: 'Wet weather drives umbrellas, drying and seasonal-illness needs.',
   },
 ]
 
