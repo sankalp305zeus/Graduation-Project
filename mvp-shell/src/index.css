@@ -329,11 +329,18 @@ h1, h2, h3, .display {
   padding: 6px 0;
 }
 
+.threshold-bar-wrap {
+  position: relative;
+  /* Room above the track for the zone marker badge to sit in, rather than
+     overlapping the cart rows above it. */
+  margin-top: 22px;
+}
+
 .threshold-bar-track {
+  position: relative;
   height: 8px;
   background: var(--border);
   border-radius: 6px;
-  margin-top: 10px;
   overflow: hidden;
 }
 
@@ -341,12 +348,94 @@ h1, h2, h3, .display {
   height: 100%;
   background: var(--green);
   transition: width 0.3s ease;
+  position: relative;
+  z-index: 1;
+}
+
+/* Amber tint showing where the discovery window sits on the bar, so it's
+   visible whether you're approaching it, in it, or have passed it — the
+   fill (painted after this in the DOM) covers it as progress reaches it,
+   which reads naturally as "this part of the bar is now behind you." */
+.zone-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: rgba(248, 203, 70, 0.4);
+}
+
+.zone-marker {
+  position: absolute;
+  top: -20px;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--yellow-soft);
+  border: 1.5px solid var(--yellow);
+  color: #8A6A1F;
+}
+
+.zone-marker-before {
+  animation: zoneBob 1.8s ease-in-out infinite;
+}
+
+.zone-marker-active {
+  background: var(--yellow);
+  border-color: #E0AF2E;
+  color: var(--ink);
+}
+
+.zone-marker-active::after {
+  content: '';
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  border: 1.5px solid var(--yellow);
+  animation: zonePulse 1.6s ease-out infinite;
+}
+
+.zone-marker-after {
+  background: #F1EFEA;
+  border-color: var(--border);
+  color: var(--ink-soft);
+  opacity: 0.8;
+}
+
+@keyframes zoneBob {
+  0%, 100% { transform: translateX(-50%) translateY(0); }
+  50% { transform: translateX(-50%) translateY(-3px); }
+}
+
+@keyframes zonePulse {
+  0% { opacity: 0.6; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1.5); }
 }
 
 .threshold-msg {
   font-size: 12px;
   margin-top: 6px;
   color: var(--ink-soft);
+}
+
+.zone-hint {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  margin-top: 5px;
+  color: #8A6A1F;
+}
+
+.zone-hint-muted {
+  color: var(--ink-soft);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .zone-marker-before { animation: none; }
+  .zone-marker-active::after { animation: none; display: none; }
 }
 
 .cart-total-row {

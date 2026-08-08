@@ -148,7 +148,13 @@ export default function App() {
 
         <CategoryGrid products={products} persona={persona} onAdd={handleAdd} />
 
-        <CartPanel cartItems={cart} subtotal={subtotal} threshold={FREE_DELIVERY_THRESHOLD} />
+        <CartPanel
+          cartItems={cart}
+          subtotal={subtotal}
+          threshold={FREE_DELIVERY_THRESHOLD}
+          discoveryMin={DEFICIT_MIN}
+          discoveryMax={DEFICIT_MAX}
+        />
 
         {justAccepted && (
           <div className="discovery-confirmation">
