@@ -7,11 +7,20 @@ import DiscoveryCard from './components/DiscoveryCard'
 import DiscoveryRail from './components/DiscoveryRail'
 import SeasonalRail from './components/SeasonalRail'
 import { getSeasonalContext } from './data/seasonalContext'
+import { getAffinity } from './data/personaAffinity'
 import { fetchPersonas, fetchProducts, logEvent, isConfigured } from './supabaseClient'
 
 const FREE_DELIVERY_THRESHOLD = 199
-const DEFICIT_MIN = 40
-const DEFICIT_MAX = 80
+
+// Discovery used to be gated to a 40-80 rupee deficit window. That window was
+// invisible and easy to miss on both sides: one item and you never reached it,
+// three and you sailed past — a cart 29 rupees short of free delivery showed
+// nothing at all, with no explanation. Discovery now runs whenever the cart
+// isn't empty, and the copy adapts to whether a gap still exists.
+//
+// With no gap left to size against, the rail falls back to a flat ceiling
+// rather than ranking on a negative number.
+const NO_GAP_PRICE_CEILING = 150
 
 // Categories where need is binary and externally determined — you either
 // have a baby or a pet or you don't. These aren't discovery opportunities:
@@ -33,21 +42,32 @@ function eligibleCategories(products, persona) {
   )
 }
 
+// How well a product suits the moment. With a gap still open, closeness to
+// that gap; once free delivery is reached there's no gap to match, so cheaper
+// items simply rank first.
+function priceFit(product, gapTarget) {
+  return gapTarget != null ? Math.abs(product.price - gapTarget) : product.price
+}
+
 // PLACEHOLDER recommendation logic — deterministic, no AI/RAG call.
-// Picks the eligible-category product whose price is closest to the
-// current checkout deficit. Replace this function with a real API call
-// (Vercel serverless -> Claude, RAG-grounded on discovery-engine themes)
-// once that layer exists — everything else in the UI stays the same.
-function pickRecommendation(products, persona, deficit) {
+// Affinity first, then price fit. Affinity comes from the occupation printed
+// on the persona card: ranking on price alone is persona-independent, which
+// had five of six personas seeing an identical card and rail.
+// Replace with a real API call (Vercel serverless -> Claude, RAG-grounded on
+// discovery-engine themes) once that layer exists — the UI stays the same.
+function pickRecommendation(products, persona, gapTarget) {
   const eligible = eligibleCategories(products, persona)
+  const affinity = getAffinity(persona.occupation)
   const candidates = products.filter((p) => eligible.includes(p.category))
   if (candidates.length === 0) return null
-  const scored = candidates.map((p) => ({
-    product: p,
-    score: Math.abs(p.price - deficit) + (p.price > deficit ? 5 : 0),
-  }))
-  scored.sort((a, b) => a.score - b.score)
-  return scored[0].product
+
+  return candidates
+    .map((p) => ({
+      product: p,
+      affinityRank: affinity.includes(p.category) ? 0 : 1,
+      fit: priceFit(p, gapTarget) + (gapTarget != null && p.price > gapTarget ? 5 : 0),
+    }))
+    .sort((a, b) => a.affinityRank - b.affinityRank || a.fit - b.fit)[0].product
 }
 
 // The rail below the filler card. Also deterministic: same eligible pool,
@@ -63,24 +83,29 @@ function pickRecommendation(products, persona, deficit) {
 const RAIL_SIZE = 3
 const RAIL_PRICE_CEILING_MULTIPLIER = 1.5
 
-function pickRail(products, persona, exclude, deficit) {
-  const ceiling = Math.round(deficit * RAIL_PRICE_CEILING_MULTIPLIER)
+function pickRail(products, persona, exclude, gapTarget) {
+  const ceiling =
+    gapTarget != null ? Math.round(gapTarget * RAIL_PRICE_CEILING_MULTIPLIER) : NO_GAP_PRICE_CEILING
   const eligible = eligibleCategories(products, persona)
+  const affinity = getAffinity(persona.occupation)
   const pool = products.filter(
     (p) => eligible.includes(p.category) && p.id !== exclude?.id && p.price <= ceiling
   )
 
-  // Order categories by how well their best item fits the gap, NOT by catalog
-  // insertion order. Insertion order meant the rail always drew the same first
-  // three categories for every persona, leaving everything later in the
-  // catalog (including any newly added category) permanently invisible.
-  // Sorting by fit keeps this fully deterministic and reproducible for a demo,
-  // while letting a new category compete on merit from the day it's added.
-  const fit = (p) => Math.abs(p.price - deficit)
+  // Order categories by affinity, then by how well their best item fits.
+  // NOT by catalog insertion order — that made the rail draw the same first
+  // three categories for everyone and left later categories (including newly
+  // added ones) permanently invisible. Ranking on fit alone then made every
+  // persona converge on the same products, since fit ignores who is shopping.
+  // Affinity first, fit second, keeps it varied AND deterministic.
   const byCategory = eligible
-    .map((c) => pool.filter((p) => p.category === c).sort((a, b) => fit(a) - fit(b)))
+    .map((c) => pool.filter((p) => p.category === c).sort((a, b) => priceFit(a, gapTarget) - priceFit(b, gapTarget)))
     .filter((bucket) => bucket.length > 0)
-    .sort((a, b) => fit(a[0]) - fit(b[0]))
+    .sort((a, b) => {
+      const aAff = affinity.includes(a[0].category) ? 0 : 1
+      const bAff = affinity.includes(b[0].category) ? 0 : 1
+      return aAff - bAff || priceFit(a[0], gapTarget) - priceFit(b[0], gapTarget)
+    })
 
   const rail = []
   for (let round = 0; rail.length < RAIL_SIZE; round += 1) {
@@ -124,7 +149,16 @@ function pickSeasonal(products, persona, context, excludeIds) {
     return aHabitual - bHabitual
   })
 
-  const buckets = cats.map((c) => pool.filter((p) => p.category === c))
+  // Within each category, an item explicitly tagged for THIS occasion wins.
+  // Without this, Raksha Bandhan surfaced a generic Gift Wrap Set instead of
+  // the Rakhi gift box, purely because the generic item appears earlier in the
+  // catalog — the occasion stock would never have been seen.
+  const taggedFirst = (a, b) => {
+    const aTag = (a.occasions ?? []).includes(context.id) ? 0 : 1
+    const bTag = (b.occasions ?? []).includes(context.id) ? 0 : 1
+    return aTag - bTag
+  }
+  const buckets = cats.map((c) => pool.filter((p) => p.category === c).sort(taggedFirst))
   const out = []
   for (let round = 0; out.length < SEASONAL_SIZE; round += 1) {
     const before = out.length
@@ -161,22 +195,21 @@ export default function App() {
   const subtotal = cart.reduce((sum, item) => sum + item.price, 0)
   const deficit = FREE_DELIVERY_THRESHOLD - subtotal
 
+  // null once free delivery is reached — there is no gap left to price against.
+  const gapTarget = deficit > 0 ? deficit : null
+
   const showDiscovery =
-    Boolean(persona) &&
-    deficit >= DEFICIT_MIN &&
-    deficit <= DEFICIT_MAX &&
-    dismissedAtSubtotal !== subtotal &&
-    !justAccepted
+    Boolean(persona) && cart.length > 0 && dismissedAtSubtotal !== subtotal && !justAccepted
 
   const recommendation = useMemo(() => {
     if (!showDiscovery || !persona) return null
-    return pickRecommendation(products, persona, deficit)
-  }, [showDiscovery, persona, products, deficit])
+    return pickRecommendation(products, persona, gapTarget)
+  }, [showDiscovery, persona, products, gapTarget])
 
   const railProducts = useMemo(() => {
     if (!showDiscovery || !persona) return []
-    return pickRail(products, persona, recommendation, deficit)
-  }, [showDiscovery, persona, products, recommendation, deficit])
+    return pickRail(products, persona, recommendation, gapTarget)
+  }, [showDiscovery, persona, products, recommendation, gapTarget])
 
   const seasonalContext = useMemo(
     () => (persona ? getSeasonalContext(persona.city) : null),
@@ -250,13 +283,7 @@ export default function App() {
 
         <CategoryGrid products={products} persona={persona} onAdd={handleAdd} />
 
-        <CartPanel
-          cartItems={cart}
-          subtotal={subtotal}
-          threshold={FREE_DELIVERY_THRESHOLD}
-          discoveryMin={DEFICIT_MIN}
-          discoveryMax={DEFICIT_MAX}
-        />
+        <CartPanel cartItems={cart} subtotal={subtotal} threshold={FREE_DELIVERY_THRESHOLD} />
 
         {justAccepted && (
           <div className="discovery-confirmation">

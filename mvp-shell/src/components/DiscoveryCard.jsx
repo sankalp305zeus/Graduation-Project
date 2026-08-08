@@ -20,7 +20,11 @@ export default function DiscoveryCard({ product, persona, deficit, onAccept, onD
       <div className="discovery-headline">{product.category}</div>
       <div className="discovery-subline">
         {persona.name} orders {habit} regularly — this category isn't part of that usual basket.
-        <span className="discovery-deficit">₹{deficit} from free delivery</span>
+        {/* Only meaningful while a gap remains; past the threshold the card
+            stands on the category opportunity alone. */}
+        {deficit > 0 && (
+          <span className="discovery-deficit">₹{deficit} from free delivery</span>
+        )}
       </div>
 
       <div className="discovery-main">
@@ -104,9 +108,12 @@ export default function DiscoveryCard({ product, persona, deficit, onAccept, onD
               them justifies the pick — without this line a reader can
               reasonably infer a model made the choice. It did not. */}
           <div className="why-caveat">
-            <strong>How this pick was made:</strong> deterministic price-fit
-            against the ₹{deficit} checkout gap, limited to categories outside{' '}
-            {persona.name}'s usual basket — prototype logic, not a model call.
+            <strong>How this pick was made:</strong>{' '}
+            {deficit > 0
+              ? `deterministic price-fit against the ₹${deficit} checkout gap, weighted toward ${persona.name}'s stated interests`
+              : `deterministic ranking weighted toward ${persona.name}'s stated interests`}
+            , limited to categories outside their usual basket — prototype
+            logic, not a model call.
           </div>
         </div>
       )}
